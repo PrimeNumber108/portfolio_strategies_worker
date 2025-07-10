@@ -1,0 +1,33 @@
+import os
+from dotenv import load_dotenv
+load_dotenv()
+INTERVALS = ['1m', '3m', '5m', '15m', '30m', '1h', '2h', '4h', '1d', '1w', '1M']
+LIST_QUOTE_SYMBOL = ['BTC', 'ETH']
+# env
+TELEGRAM_ERROR_CHANNEL = os.getenv('TELEGRAM_ERROR_CHANNEL','')
+TELEGRAM_ASSET_CHANNEL_METIS_CLIENT = os.getenv('TELEGRAM_ASSET_CHANNEL_METIS_CLIENT','')
+TELEGRAM_ASSET_CHANNEL_METIS_TEST_CLIENT = os.getenv('TELEGRAM_ASSET_CHANNEL_METIS_TEST_CLIENT','')
+TELEGRAM_ASSET_CHANNEL_CIRUS_CLIENT = os.getenv('TELEGRAM_ASSET_CHANNEL_CIRUS_CLIENT','')
+TELEGRAM_ASSET_CHANNEL_BBT_CLIENT = os.getenv('TELEGRAM_ASSET_CHANNEL_BBT_CLIENT','')
+TELEGRAM_ASSET_CHANNEL_XETA_CLIENT = os.getenv('TELEGRAM_ASSET_CHANNEL_XETA_CLIENT','')
+TELEGRAM_ASSET_CHANNEL_HOLD_CLIENT = os.getenv('TELEGRAM_ASSET_CHANNEL_HOLD_CLIENT','')
+TELEGRAM_ASSET_CHANNEL_MMVOL = os.getenv('TELEGRAM_ASSET_CHANNEL_MMVOL','')
+TELEGRAM_ASSET_CHANNEL_TEST = os.getenv('TELEGRAM_ASSET_CHANNEL_TEST','')
+TELEGRAM_ASSET_CHANNEL_MULTI_PREMANI = os.getenv('TELEGRAM_ASSET_CHANNEL_MULTI_PREMANI','')
+TELEGRAM_TOKEN = os.getenv('TELEGRAM_TOKEN', '')
+TELEGRAM_TOKEN_TEST = os.getenv('TELEGRAM_TOKEN_TEST','')
+MYSQL_HOST = os.getenv("MYSQL_HOST")
+MYSQL_USER = os.getenv("MYSQL_USER")
+MYSQL_PASSWORD = os.getenv("MYSQL_PASSWORD")
+MYSQL_DATABASE = os.getenv("MYSQL_DATABASE")
+MODE = os.getenv('MODE')
+MODE_TEST = os.getenv('MODE_TEST')
+LOGGER_PATH = './logger/'
+ACCOUNTS_FILE_PATH = "./platform_interactions/accounts.json"
+IVMS_FILE_PATH = "./platform_interactions/ivm0001.json"
+
+# constants
+RUNNING_STRATEGY_STATUS_PATH = "/home/ubuntu/exchange_mm/running_strategy_status.json"
+URL="wss://open-api-ws.bingx.com/market" 
+BINGX_API_URL = "https://open-api.bingx.com"
+GATE_API_URL = "https://api.gateio.ws/api/v4"
