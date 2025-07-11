@@ -212,6 +212,7 @@ def main():
     """
     Main function to run the strategy
     """
+    print("Running BTC Test Strategy...")
     # Configuration - Replace with your actual API credentials
     # API_KEY = os.getenv('POLONIEX_API_KEY', '')
     # SECRET_KEY = os.getenv('POLONIEX_SECRET_KEY', '')
