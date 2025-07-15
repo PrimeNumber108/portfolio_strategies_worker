@@ -10,6 +10,8 @@ import time
 import json
 import requests
 from decimal import Decimal
+from logger import logger_database, logger_error
+
 
 # Add the parent directory to the path to import our modules
 CURRENT_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -219,5 +221,7 @@ def main():
         return False
 
 if __name__ == "__main__":
+    logger_database.warning("it's oke")
+
     success = main()
     sys.exit(0 if success else 1)

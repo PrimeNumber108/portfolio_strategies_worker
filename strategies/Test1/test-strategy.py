@@ -9,6 +9,7 @@ import sys
 import time
 import json
 from decimal import Decimal
+from logger import logger_database, logger_error
 
 # Add the parent directory to the path to import our modules
 # sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -245,4 +246,5 @@ def main():
         print(f"❌ Fatal error: {e}")
 
 if __name__ == "__main__":
+    logger_database.warning("it's oke")
     main()
