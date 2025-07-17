@@ -9,38 +9,6 @@ from logger import logger_database
 from config import MYSQL_HOST, MYSQL_USER, MYSQL_PASSWORD, MYSQL_DATABASE
 r = redis.Redis(host='localhost', port=6379, decode_responses=True)
 
-# def get_connection():
-#     """
-#     Establishes a connection to a MySQL database and returns a tuple containing the connection object and a cursor object.
-
-#     Returns:
-#         tuple: A tuple containing the connection object and a cursor object.
-
-#     Raises:
-#         mysql.connector.Error: If there is an error connecting to the MySQL database.
-#     """
-
-#     try:
-#         connection = pymysql.connect(
-#             host=MYSQL_HOST,
-#             user=MYSQL_USER,
-#             password=MYSQL_PASSWORD,
-#             database=MYSQL_DATABASE,
-#             port=3306
-#         )
-           
-#     except:
-#             connection = mysql.connector.connect(
-#             host=MYSQL_HOST,
-#             user=MYSQL_USER,
-#             password=MYSQL_PASSWORD,
-#             database=MYSQL_DATABASE
-#             # port=3306
-#         )
-    
-#     cursor = connection.cursor()
-#     return connection, cursor
-
 def get_connection():
     """
     Establishes a connection to a MySQL database with retry mechanism.
