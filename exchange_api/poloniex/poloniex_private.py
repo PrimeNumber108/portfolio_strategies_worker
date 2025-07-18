@@ -5,13 +5,18 @@ import redis
 # from logger import logger_poloniex
 from .authentication import Request
 from decimal import Decimal
+import uuid
 
 
 base_url = "https://api.poloniex.com"
 r = redis.Redis(host='localhost', port=6379, decode_responses=True)
 
+# Golang API configuration
+GOLANG_API_BASE_URL = "http://localhost:8083"
+GOLANG_API_TOKEN = None  # Will be set during authentication
+
 class PoloniexPrivate:
-    def __init__(self,  symbol, quote = 'USDT', api_key = '', secret_key='', passphrase=''):
+    def __init__(self,  symbol, quote = 'USDT', api_key = '', secret_key='', passphrase='', session_key=''):
         self.symbol = symbol
         self.quote = quote
         self.base = symbol
@@ -24,6 +29,8 @@ class PoloniexPrivate:
         self._request = Request(api_key, secret_key, url=base_url)
         self.qty_scale = 0
         self.price_scale = 0
+        self.session_key = session_key or str(uuid.uuid4())  # Generate unique session key if not provided
+        self.golang_api_token = None  # Will be set after authentication
         
         scale_redis = r.get(f'{self.symbol_redis}_poloniex_scale')
         if scale_redis is not None:
@@ -194,6 +201,147 @@ class PoloniexPrivate:
             symbol = self.symbol_ex
         return self._request('GET', f'/markets/{symbol}/price')
     
+    def authenticate_golang_api(self, username="dattest@the20.vn", password="Fin20admin@1234"):
+        """Authenticate with Golang API and store token"""
+        try:
+            auth_data = {
+                "username": username,
+                "password": password
+            }
+            
+            print(f"🔐 Authenticating with: {GOLANG_API_BASE_URL}/api/v1/auth/login")
+            print(f"🔐 Auth data: {auth_data}")
+            
+            response = requests.post(
+                f"{GOLANG_API_BASE_URL}/api/v1/auth/login",
+                json=auth_data,
+                headers={"Content-Type": "application/json"},
+                timeout=10
+            )
+            
+            print(f"🔐 Response Status: {response.status_code}")
+            print(f"🔐 Response Headers: {dict(response.headers)}")
+            print(f"🔐 Response Text: {response.text}")
+            
+            if response.status_code == 200:
+                try:
+                    auth_response = response.json()
+                    self.golang_api_token = auth_response.get("access_token")
+                    print(f"✅ Successfully authenticated with Golang API")
+                    print(f"✅ Token: {self.golang_api_token[:20] if self.golang_api_token else 'None'}...")
+                    return True
+                except json.JSONDecodeError as e:
+                    print(f"❌ JSON decode error: {e}")
+                    return False
+            else:
+                print(f"❌ Authentication failed: {response.status_code} - {response.text}")
+                return False
+                
+        except Exception as e:
+            print(f"❌ Error authenticating with Golang API: {str(e)}")
+            return False
+    
+    def store_order_in_golang_api(self, order_data, exchange_order_id=None, status="pending"):
+        """Store order data in Golang API"""
+        try:
+            # Ensure authentication
+            if not self.golang_api_token:
+                if not self.authenticate_golang_api():
+                    print("❌ Cannot store order - authentication failed")
+                    return False
+            
+            # Prepare order data for Golang API
+            golang_order_data = {
+                "session_key": self.session_key,
+                "symbol": order_data.get("symbol", self.symbol_ex),
+                "side": order_data.get("side", "").lower(),
+                "order_type": order_data.get("type", "market").lower(),
+                "quantity": float(order_data.get("quantity", 0)),
+                "price": float(order_data.get("price", 0)) if order_data.get("price") else 0,
+                "time_in_force": order_data.get("timeInForce", "GTC")
+            }
+            
+            headers = {
+                "Content-Type": "application/json",
+                "Authorization": f"Bearer {self.golang_api_token}"
+            }
+            
+            # Create order in Golang API
+            print(f"📝 Creating order in Golang API: {golang_order_data}")
+            response = requests.post(
+                f"{GOLANG_API_BASE_URL}/api/v1/orders/orders",
+                json=golang_order_data,
+                headers=headers,
+                timeout=10
+            )
+            
+            print(f"📝 Response Status: {response.status_code}")
+            print(f"📝 Response Text: {response.text}")
+            print(f"📝 Response Headers: {dict(response.headers)}")
+            
+            if response.status_code == 201:
+                try:
+                    golang_response = response.json()
+                    order_id = golang_response.get("order", {}).get("order_id")
+                    print(f"✅ Order stored in Golang API with ID: {order_id}")
+                    
+                    # If we have exchange order ID, update the order
+                    if exchange_order_id:
+                        self.update_order_in_golang_api(order_id, exchange_order_id, status)
+                    
+                    return True
+                except json.JSONDecodeError as e:
+                    print(f"❌ JSON decode error on success response: {e}")
+                    return False
+            else:
+                print(f"❌ Failed to store order in Golang API: {response.status_code} - {response.text}")
+                return False
+                
+        except Exception as e:
+            print(f"❌ Error storing order in Golang API: {str(e)}")
+            return False
+    
+    def update_order_in_golang_api(self, order_id, exchange_order_id=None, status="pending", filled_qty=0, avg_price=0):
+        """Update order status in Golang API"""
+        try:
+            if not self.golang_api_token:
+                print("❌ Cannot update order - not authenticated")
+                return False
+            
+            update_data = {
+                "status": status
+            }
+            
+            if exchange_order_id:
+                update_data["exchange_order_id"] = exchange_order_id
+            if filled_qty > 0:
+                update_data["filled_qty"] = filled_qty
+            if avg_price > 0:
+                update_data["avg_price"] = avg_price
+            
+            headers = {
+                "Content-Type": "application/json",
+                "Authorization": f"Bearer {self.golang_api_token}"
+            }
+            
+            response = requests.put(
+                f"{GOLANG_API_BASE_URL}/api/v1/orders/orders/{order_id}/status",
+                json=update_data,
+                headers=headers,
+                timeout=10
+            )
+            
+            if response.status_code == 200:
+                print(f"✅ Order {order_id} updated in Golang API")
+                return True
+            else:
+                print(f"❌ Failed to update order in Golang API: {response.status_code} - {response.text}")
+                return False
+                
+        except Exception as e:
+            print(f"❌ Error updating order in Golang API: {str(e)}")
+            return False
+    
     def place_order(self, side_order, quantity, order_type, price='', force='normal'): 
         force = 'GTC' if force == 'normal' else force
         symbol = f'{self.base}_{self.quote}'
@@ -228,9 +376,37 @@ class PoloniexPrivate:
         body.update(params_map)
         result = self._request('POST', '/orders', True, body=body)
         print('result test: ',result)
+        
         if result and isinstance(result, dict) and "id" in result:
             print('run 1')
             result['orderId'] = result['id']
+            
+            # ✅ NEW: Store order in Golang API
+            print("📝 Storing order in Golang API...")
+            try:
+                # Prepare order data for Golang API
+                order_data_for_golang = {
+                    "symbol": symbol,
+                    "side": side_order.upper(),
+                    "type": order_type.upper(),
+                    "quantity": params_map.get("quantity", params_map.get("amount", quantity)),
+                    "price": params_map.get("price", 0),
+                    "timeInForce": force
+                }
+                
+                # Store order in Golang API
+                self.store_order_in_golang_api(
+                    order_data_for_golang,
+                    exchange_order_id=result['id'],
+                    status="pending"
+                )
+                
+                print(f"✅ Order {result['id']} stored in both Poloniex and Golang API")
+                
+            except Exception as e:
+                print(f"⚠️ Warning: Failed to store order in Golang API: {str(e)}")
+                # Don't fail the entire operation if Golang API storage fails
+                
             return {"data": result, "code": 0}
         else:
             return {"data": {}, "code": -1, "message": "Order placement failed"}
