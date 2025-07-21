@@ -258,8 +258,13 @@ class PoloniexPrivate:
                 "order_type": order_data.get("type", "market").lower(),
                 "quantity": float(order_data.get("quantity", 0)),
                 "price": float(order_data.get("price", 0)) if order_data.get("price") else 0,
-                "time_in_force": order_data.get("timeInForce", "GTC")
+                "time_in_force": order_data.get("timeInForce", "GTC"),
+                "status": status,
             }
+            
+            # Add exchange order ID if provided
+            if exchange_order_id:
+                golang_order_data["exchange_order_id"] = exchange_order_id
             
             headers = {
                 "Content-Type": "application/json",
@@ -308,6 +313,12 @@ class PoloniexPrivate:
                 print("❌ Cannot update order - not authenticated")
                 return False
             
+            # Validate status
+            valid_statuses = ["pending", "filled", "canceled", "rejected", "partially_filled"]
+            if status not in valid_statuses:
+                print(f"❌ Invalid status '{status}'. Must be one of: {valid_statuses}")
+                return False
+            
             update_data = {
                 "status": status
             }
@@ -324,8 +335,9 @@ class PoloniexPrivate:
                 "Authorization": f"Bearer {self.golang_api_token}"
             }
             
+            print(f"🔄 Updating order {order_id} with data: {update_data}")
             response = requests.put(
-                f"{GOLANG_API_BASE_URL}/api/v1/orders/orders/{order_id}/status",
+                f"{GOLANG_API_BASE_URL}/api/v1/orders/{order_id}/status",
                 json=update_data,
                 headers=headers,
                 timeout=10
@@ -393,12 +405,12 @@ class PoloniexPrivate:
                     "price": params_map.get("price", 0),
                     "timeInForce": force
                 }
-                
+                print('result: ', result)
                 # Store order in Golang API
                 self.store_order_in_golang_api(
                     order_data_for_golang,
                     exchange_order_id=result['id'],
-                    status="pending"
+                    status=result.get('state', '') or result.get('status', '')
                 )
                 
                 print(f"✅ Order {result['id']} stored in both Poloniex and Golang API")
