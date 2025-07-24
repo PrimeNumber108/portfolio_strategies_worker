@@ -2,7 +2,34 @@ import time
 import math
 import json
 import redis
-from  binance.client import Client
+import sys
+import os
+
+_original_path = sys.path[:]
+# Remove directories that might contain the local binance.py file
+current_dir = os.path.dirname(os.path.abspath(__file__))
+project_root = os.path.abspath(os.path.join(current_dir, "../../"))
+result_dir = os.path.join(project_root, "result")
+
+# Create a new sys.path that prioritizes site-packages over local directories
+new_path = []
+# Add all paths that don't start with our project root first
+for p in sys.path:
+    if not p.startswith(project_root) and p != '' and p != '.':
+        new_path.append(p)
+# Then add project paths, but exclude the result directory
+for p in sys.path:
+    if p.startswith(project_root) and not p.startswith(result_dir):
+        new_path.append(p)
+
+sys.path = new_path
+
+try:
+    from binance.client import Client
+finally:
+    # Restore original sys.path
+    sys.path = _original_path
+
 from utils import convert_order_status
 FEE_PERCENT = 0.1/100
 r = redis.Redis(host='localhost', port=6379, decode_responses=True)

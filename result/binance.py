@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Poloniex Result Checker
+Binance Result Checker
 This script is called when a trading session is stopped to check various results.
 It can perform multiple types of checks: balance, portfolio, trades, etc.
 """
@@ -25,49 +25,48 @@ from utils import (
     get_precision_from_real_number
 )
 
-class PoloniexBalanceChecker:
+class BinanceBalanceChecker:
     def __init__(self, api_key="", secret_key="", passphrase="", session_id=""):
         """
-        Initialize the Poloniex balance checker
+        Initialize the Binance balance checker
         
         Args:
-            api_key (str): Poloniex API key
-            secret_key (str): Poloniex secret key
-            passphrase (str): Poloniex passphrase
+            api_key (str): Binance API key
+            secret_key (str): Binance secret key
+            passphrase (str): Binance passphrase (not used for Binance)
             session_id (str): Session ID for tracking
         """
         self.symbol = "BTC"
         self.quote = "USDT"
         self.session_id = session_id
-        self.exchange = "poloniex"
+        self.exchange = "binance"
         self.run_key = generate_random_string()
         
-        # Initialize Poloniex client using the factory function
+        # Initialize Binance client using the factory function
         try:
             account_info = {
                 "api_key": api_key,
                 "secret_key": secret_key,
-                "passphrase": passphrase,
-                "session_key": session_id  # Poloniex uses session_key
+                "passphrase": passphrase
             }
             
             self.client = get_client_exchange(
-                exchange_name="poloniex",
+                exchange_name="binance",
                 acc_info=account_info,
                 symbol=self.symbol,
                 quote=self.quote,
                 use_proxy=False  # Disable proxy to avoid connection issues
             )
-            print(f"✅ Poloniex client initialized successfully for session: {session_id}")
-            logger_database.info(f"Poloniex balance checker initialized for session: {session_id}")
+            print(f"✅ Binance client initialized successfully for session: {session_id}")
+            logger_database.info(f"Binance balance checker initialized for session: {session_id}")
         except Exception as e:
-            print(f"❌ Failed to initialize Poloniex client: {e}")
-            logger_error.error(f"Failed to initialize Poloniex client for session {session_id}: {e}")
+            print(f"❌ Failed to initialize Binance client: {e}")
+            logger_error.error(f"Failed to initialize Binance client for session {session_id}: {e}")
             raise
 
     def get_all_balances(self):
         """
-        Get all account balances from Poloniex
+        Get all account balances from Binance
         
         Returns:
             dict: Complete balance information for all assets
@@ -117,7 +116,7 @@ class PoloniexBalanceChecker:
                 return result
                 
             else:
-                error_msg = "No balance data received from Poloniex API"
+                error_msg = "No balance data received from Binance API"
                 print(f"❌ {error_msg}")
                 logger_error.error(f"Balance fetch failed for session {self.session_id}: {error_msg}")
                 
@@ -141,8 +140,8 @@ class PoloniexBalanceChecker:
                 self.run_key,
                 self.symbol,
                 get_line_number(),
-                "POLONIEX",
-                "poloniex.py",
+                "BINANCE",
+                "binance.py",
                 error_msg
             )
             
@@ -218,8 +217,8 @@ class PoloniexBalanceChecker:
                 self.run_key,
                 asset_symbol,
                 get_line_number(),
-                "POLONIEX",
-                "poloniex.py",
+                "BINANCE",
+                "binance.py",
                 error_msg
             )
             
@@ -245,7 +244,7 @@ class PoloniexBalanceChecker:
         Returns:
             dict: Balance information
         """
-        print("🚀 Starting Poloniex Balance Check...")
+        print("🚀 Starting Binance Balance Check...")
         print(f"📊 Session ID: {self.session_id}")
         print(f"🔍 Asset Filter: {asset_filter if asset_filter else 'All assets'}")
         print("-" * 50)
@@ -273,8 +272,8 @@ class PoloniexBalanceChecker:
                 self.run_key,
                 self.symbol,
                 get_line_number(),
-                "POLONIEX",
-                "poloniex.py",
+                "BINANCE",
+                "binance.py",
                 error_msg
             )
             
@@ -293,19 +292,19 @@ def main():
     """
     Main function to run the balance checker
     """
-    print("🔍 Running Poloniex Balance Checker...")
+    print("🔍 Running Binance Balance Checker...")
     
     # Get API credentials from environment variables
     API_KEY = os.environ.get('STRATEGY_API_KEY', '')
     SECRET_KEY = os.environ.get('STRATEGY_API_SECRET', '')
-    PASSPHRASE = os.environ.get('STRATEGY_PASSPHRASE', '')
+    PASSPHRASE = os.environ.get('STRATEGY_PASSPHRASE', '')  # Not used for Binance
     SESSION_ID = os.environ.get('STRATEGY_SESSION_KEY', '')
     ASSET_FILTER = os.environ.get('STRATEGY_ASSET_FILTER', '')
 
     if not API_KEY or not SECRET_KEY:
         error_result = {
             "success": False,
-            "exchange": "poloniex",
+            "exchange": "binance",
             "session_id": SESSION_ID,
             "timestamp": int(time.time()),
             "error": "API credentials not provided",
@@ -323,7 +322,7 @@ def main():
     
     try:
         # Initialize balance checker
-        checker = PoloniexBalanceChecker(
+        checker = BinanceBalanceChecker(
             api_key=API_KEY,
             secret_key=SECRET_KEY,
             passphrase=PASSPHRASE,
@@ -343,7 +342,7 @@ def main():
     except Exception as e:
         error_result = {
             "success": False,
-            "exchange": "poloniex",
+            "exchange": "binance",
             "session_id": SESSION_ID,
             "timestamp": int(time.time()),
             "error": f"Fatal error: {str(e)}",
