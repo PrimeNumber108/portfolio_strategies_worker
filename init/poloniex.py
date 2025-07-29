@@ -216,8 +216,8 @@ def create_poloniex_account_snapshot(acc_info=None, quote='USDT'):
 # Example usage and testing
 if __name__ == "__main__":
     example_acc_info = {
-        'api_key': '42DFVKZ3-2JMTZF9F-C7CK4HLO-VWINY6J2',
-        'secret_key': '618e840d8e92bf4fd8b0b15c3994ca23603535e1faf062813ca708c52d16ae663bfcc2f85961cd3cd620f0a2721cefdbd56674bf3beb669d073d458aab157ee1',
+        'api_key': '',
+        'secret_key': '',
         'passphrase': ''  # Required for Poloniex
     }
     
