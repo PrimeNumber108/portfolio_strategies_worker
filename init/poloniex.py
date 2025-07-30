@@ -1,246 +1,369 @@
 #!/usr/bin/env python3
 """
-Poloniex Account Snapshot Utility
-This module provides functionality to take a snapshot of Poloniex account balances
-and calculate their current USD values.
+Poloniex Result Checker
+This script is called when a trading session is stopped to check various results.
+It can perform multiple types of checks: balance, portfolio, trades, etc.
 """
 
-import sys
 import os
+import sys
+import time
 import json
-from decimal import Decimal, ROUND_DOWN
+from decimal import Decimal
 
-# Add the parent directory to the path to import our modules
 CURRENT_DIR = os.path.dirname(os.path.abspath(__file__))
 PROJECT_ROOT = os.path.abspath(os.path.join(CURRENT_DIR, "../"))
 sys.path.insert(0, PROJECT_ROOT)
 
+from logger import logger_database, logger_error
 from exchange_api_spot.user import get_client_exchange
-from logger import logger_error
+from utils import (
+    get_line_number,
+    update_key_and_insert_error_log,
+    generate_random_string,
+    get_precision_from_real_number
+)
 
-
-class PoloniexAccountSnapshot:
-    """
-    Class for taking Poloniex account snapshots and calculating portfolio values.
-    """
-    
-    def __init__(self, acc_info=None):
+class PoloniexBalanceChecker:
+    def __init__(self, api_key="", secret_key="", passphrase="", session_id=""):
         """
-        Initialize the PoloniexAccountSnapshot with exchange client.
+        Initialize the Poloniex balance checker
         
         Args:
-            acc_info (dict): Account information containing api_key, secret_key, passphrase
+            api_key (str): Poloniex API key
+            secret_key (str): Poloniex secret key
+            passphrase (str): Poloniex passphrase
+            session_id (str): Session ID for tracking
         """
-        self.exchange_name = 'poloniex'
-        self.acc_info = acc_info
-        self.client = None
-        
-        if acc_info:
-            try:
-                self.client = get_client_exchange(
-                    exchange_name='poloniex',
-                    acc_info=acc_info,
-                    symbol='BTC',
-                    quote='USDT'
-                )
-            except Exception as e:
-                logger_error.error(f"Failed to initialize Poloniex client: {e}")
-                raise
-    
-    def get_account_balances(self):
-        """
-        Get account balances from Poloniex.
-        
-        Returns:
-            list: List of asset balances
-        """
-        if not self.client:
-            raise ValueError("Poloniex client not initialized")
+        self.symbol = "BTC"
+        self.quote = "USDT"
+        self.session_id = session_id
+        self.exchange = "poloniex"
+        self.run_key = generate_random_string()
         
         try:
-            # Get account balance using the client's get_account_balance method
+            account_info = {
+                "api_key": api_key,
+                "secret_key": secret_key,
+                "passphrase": passphrase,
+                "session_key": session_id  # Poloniex uses session_key
+            }
+            
+            self.client = get_client_exchange(
+                exchange_name="poloniex",
+                acc_info=account_info,
+                symbol=self.symbol,
+                quote=self.quote,
+                use_proxy=False  # Disable proxy to avoid connection issues
+            )
+            print(f"Poloniex client initialized successfully for session: {session_id}")
+            logger_database.info(f"Poloniex balance checker initialized for session: {session_id}")
+        except Exception as e:
+            print(f"Failed to initialize Poloniex client: {e}")
+            logger_error.error(f"Failed to initialize Poloniex client for session {session_id}: {e}")
+            raise
+
+    def get_all_balances(self):
+        """
+        Get all account balances from Poloniex using get_account_balance() and ticker prices
+        
+        Returns:
+            dict: Complete balance information for all assets with prices in the requested format
+        """
+        try:
+            print(f"Fetching all account balances for session: {self.session_id}")
+            logger_database.info(f"Fetching all account balances for session: {self.session_id}")
+            
+            # Get account balance using get_account_balance() method
             balance_data = self.client.get_account_balance()
-            logger_error.info(f"Poloniex balance_data: {balance_data}")
             
             if not balance_data or 'data' not in balance_data:
-                logger_error.warning("No balance data received from Poloniex")
-                return []
+                error_msg = "No balance data received from get_account_balance() API"
+                print(f"{error_msg}")
+                logger_error.error(f"Balance fetch failed for session {self.session_id}: {error_msg}")
+                
+                return {
+                    "success": False,
+                    "exchange": self.exchange,
+                    "session_id": self.session_id,
+                    "timestamp": int(time.time()),
+                    "error": error_msg,
+                    "Total": 0.0
+                }
             
             balances = balance_data['data']
+            print(f"  Retrieved {len(balances)} assets from get_account_balance()")
             
-            # Filter out assets with zero balance and format the data
-            filtered_balances = []
-            for asset_symbol, balance_info in balances.items():
-                total_balance = balance_info.get('total', 0)
-                if total_balance > 0:
-                    filtered_balances.append({
-                        'asset': asset_symbol,
-                        'available': str(balance_info.get('available', 0)),
-                        'locked': str(balance_info.get('locked', 0)),
-                        'total': str(total_balance)
-                    })
+            # Format balance data with prices in the requested format
+            formatted_balances = {}
+            total_value_usd = 0.0
             
-            return filtered_balances
+            for asset_symbol, asset_info in balances.items():
+                amount = float(asset_info.get('total', 0))
+                
+                if amount > 0:
+                    try:
+                        if asset_symbol == 'USDT':
+                            # USDT price is always 1.0
+                            price = 1.0
+                        else:
+                            # Try to get price using get_ticker method
+                            try:
+                                ticker_data = self.client.get_ticker(asset_symbol, "USDT")
+                                price = float(ticker_data.get('last', 0)) if ticker_data else 0.0
+                            except Exception as ticker_error:
+                                print(f" Could not get ticker for {asset_symbol}_USDT: {ticker_error}")
+                                # Try get_price method if available
+                                try:
+                                    # Create a temporary client with the asset as base
+                                    temp_client = get_client_exchange(
+                                        exchange_name="poloniex",
+                                        acc_info={
+                                            "api_key": self.client.api_key,
+                                            "secret_key": self.client.secret_key,
+                                            "passphrase": self.client.passphrase,
+                                            "session_key": self.session_id
+                                        },
+                                        symbol=asset_symbol,
+                                        quote="USDT",
+                                        use_proxy=False
+                                    )
+                                    price_data = temp_client.get_price()
+                                    price = float(price_data.get('price', 0)) if price_data else 0.0
+                                except Exception as price_error:
+                                    print(f" Could not get price for {asset_symbol}: {price_error}")
+                                    price = 0.0
+                        
+                        # Add to formatted balances in the requested format
+                        formatted_balances[asset_symbol] = {
+                            "amount": amount,
+                            "price": str(price)
+                        }
+                        
+                        # Calculate USD value
+                        usd_value = amount * price
+                        total_value_usd += usd_value
+                        
+                        print(f"{asset_symbol}: Amount: {amount:.8f}, Price: ${price:.8f}, Value: ${usd_value:.2f}")
+                        
+                    except Exception as price_error:
+                        print(f" Error processing {asset_symbol}: {price_error}")
+                        # Still add the asset with 0 price
+                        formatted_balances[asset_symbol] = {
+                            "amount": amount,
+                            "price": "0"
+                        }
             
+            formatted_balances["Total"] = total_value_usd
+            
+            print(f" Successfully retrieved {len(formatted_balances)-1} assets with balance > 0")
+            print(f"💰 Total portfolio value: ${total_value_usd:.2f} USD")
+            logger_database.info(f"Successfully retrieved account balance for session: {self.session_id}")
+            return formatted_balances
+                
         except Exception as e:
-            logger_error.error(f"Failed to get Poloniex account balances: {e}")
-            raise
-    
-    def get_asset_price(self, asset, quote='USDT'):
+            error_msg = f"Error fetching account balance: {str(e)}"
+            print(f" {error_msg}")
+            logger_error.error(f"Balance fetch exception for session {self.session_id}: {error_msg}")
+            
+            update_key_and_insert_error_log(
+                self.run_key,
+                self.symbol,
+                get_line_number(),
+                "POLONIEX",
+                "poloniex.py",
+                error_msg
+            )
+            
+            return {
+                "Total": 0.0
+            }
+
+    def get_specific_asset_balance(self, asset_symbol):
         """
-        Get current price for an asset from Poloniex.
+        Get balance for a specific asset
         
         Args:
-            asset (str): Asset symbol (e.g., 'BTC', 'ETH')
-            quote (str): Quote currency (default: 'USDT')
+            asset_symbol (str): Asset symbol (e.g., 'BTC', 'USDT')
             
         Returns:
-            float: Current price of the asset
+            dict: Balance information for the specific asset
         """
-        if not self.client:
-            raise ValueError("Poloniex client not initialized")
-        
         try:
-            # For USDT and other stablecoins, return 1.0
-            if asset.upper() in ['USDT', 'USDC', 'BUSD', 'DAI', 'TUSD']:
-                return 1.0
+            print(f"  Fetching {asset_symbol} balance for session: {self.session_id}")
+            logger_database.info(f"Fetching {asset_symbol} balance for session: {self.session_id}")
             
-            # Get ticker information for the asset
-            ticker_data = self.client.get_ticker(base=asset, quote=quote)
-            logger_error.info(f"Poloniex ticker for {asset}/{quote}: {ticker_data}")
+            balance_data = self.client.get_account_assets(asset_symbol)
             
-            # Extract price from ticker data
-            if ticker_data and 'data' in ticker_data:
-                price = float(ticker_data['data'].get('price', ticker_data['data'].get('last', 0)))
+            if balance_data and 'data' in balance_data and balance_data['data']:
+                balance = balance_data['data']
+                
+                result = {
+                    "success": True,
+                    "exchange": self.exchange,
+                    "session_id": self.session_id,
+                    "timestamp": int(time.time()),
+                    "asset": asset_symbol,
+                    "available": balance['available'],
+                    "locked": balance['locked'],
+                    "total": balance['total'],
+                    "message": f"{asset_symbol} balance retrieved successfully"
+                }
+                
+                print(f" {asset_symbol} balance: Available: {balance['available']:.8f}, Locked: {balance['locked']:.8f}, Total: {balance['total']:.8f}")
+                logger_database.info(f"{asset_symbol} balance retrieved successfully for session: {self.session_id}")
+                return result
+                
             else:
-                price = 0.0
-            
-            return price
-            
+                error_msg = f"No {asset_symbol} balance found"
+                print(f" {error_msg}")
+                logger_error.warning(f"{asset_symbol} balance not found for session {self.session_id}")
+                
+                return {
+                    "success": False,
+                    "exchange": self.exchange,
+                    "session_id": self.session_id,
+                    "timestamp": int(time.time()),
+                    "asset": asset_symbol,
+                    "available": 0.0,
+                    "locked": 0.0,
+                    "total": 0.0,
+                    "error": error_msg
+                }
+                
         except Exception as e:
-            logger_error.error(f"Failed to get Poloniex price for {asset}: {e}")
-            # Return 0 if price cannot be fetched
-            return 0.0
-    
-    def calculate_portfolio_value(self, balances, quote='USDT'):
+            error_msg = f"Error fetching {asset_symbol} balance: {str(e)}"
+            print(f" {error_msg}")
+            logger_error.error(f"{asset_symbol} balance fetch exception for session {self.session_id}: {error_msg}")
+            
+            update_key_and_insert_error_log(
+                self.run_key,
+                asset_symbol,
+                get_line_number(),
+                "POLONIEX",
+                "poloniex.py",
+                error_msg
+            )
+            
+            return {
+                "success": False,
+                "exchange": self.exchange,
+                "session_id": self.session_id,
+                "timestamp": int(time.time()),
+                "asset": asset_symbol,
+                "available": 0.0,
+                "locked": 0.0,
+                "total": 0.0,
+                "error": error_msg
+            }
+
+    def check_balance(self, asset_filter=None):
         """
-        Calculate the total portfolio value in the specified quote currency.
+        Main balance checking function
         
         Args:
-            balances (list): List of asset balances
-            quote (str): Quote currency for valuation (default: 'USDT')
+            asset_filter (str, optional): Specific asset to check. If None, gets all balances.
             
         Returns:
-            dict: Portfolio snapshot with individual asset values and total
+            dict: Balance information in the requested format
         """
-        portfolio = {}
-        total_value = 0.0
+        print(f" Session ID: {self.session_id}")
+        print(f"Asset Filter: {asset_filter if asset_filter else 'All assets'}")
+        print("-" * 50)
         
-        for balance in balances:
-            asset = balance['asset']
-            amount = float(balance['total'])
-            
-            if amount <= 0:
-                continue
-            
-            try:
-                # Get current price
-                price = self.get_asset_price(asset, quote)
-                value = amount * price
-                
-                portfolio[asset] = {
-                    'amount': amount,
-                    'price': str(price),
-                    'value': str(round(value, 2))
-                }
-                
-                total_value += value
-                
-                logger_error.info(f"Poloniex {asset}: {amount} @ ${price} = ${value:.2f}")
-                
-            except Exception as e:
-                logger_error.error(f"Failed to calculate value for Poloniex {asset}: {e}")
-                portfolio[asset] = {
-                    'amount': amount,
-                    'price': '0',
-                    'value': '0'
-                }
-        
-        portfolio['Total'] = round(total_value, 2)
-        return portfolio
-    
-    def take_snapshot(self, quote='USDT'):
-        """
-        Take a complete Poloniex account snapshot with current values.
-        
-        Args:
-            quote (str): Quote currency for valuation (default: 'USDT')
-            
-        Returns:
-            dict: Complete portfolio snapshot
-        """
         try:
-            logger_error.info("Taking Poloniex account snapshot...")
-            
-            # Get account balances
-            balances = self.get_account_balances()
-            logger_error.info(f"Found {len(balances)} Poloniex assets with non-zero balance")
-            
-            # Calculate portfolio value
-            portfolio = self.calculate_portfolio_value(balances, quote)
-            
-            logger_error.info(f"Total Poloniex portfolio value: ${portfolio['Total']}")
-            
-            return portfolio
+            if asset_filter:
+                result = self.get_specific_asset_balance(asset_filter)
+                print("-" * 50)
+                if result.get('success'):
+                    print(" Balance check completed successfully!")
+                else:
+                    print(" Balance check failed!")
+                print('result is: ',result)
+                return result
+            else:
+                # For all balances, return the new format
+                result = self.get_all_balances()
+                print("-" * 50)
+                if 'Total' in result:
+                    print(" Balance check completed successfully!")
+                else:
+                    print(" Balance check failed!")
+                print('result is: ',result)
+                return result
             
         except Exception as e:
-            logger_error.error(f"Failed to take Poloniex account snapshot: {e}")
-            raise
+            error_msg = f"Balance check error: {str(e)}"
+            print(f" {error_msg}")
+            logger_error.error(f"Balance check error for session {self.session_id}: {error_msg}")
+            
+            update_key_and_insert_error_log(
+                self.run_key,
+                self.symbol,
+                get_line_number(),
+                "POLONIEX",
+                "poloniex.py",
+                error_msg
+            )
+            
+            return {
+                "Total": 0.0
+            }
 
-
-def create_poloniex_account_snapshot(acc_info=None, quote='USDT'):
+def main():
     """
-    Convenience function to create a Poloniex account snapshot.
+    Main function to run the balance checker
+    """
+    print("🔍 Running Poloniex Balance Checker...")
     
-    Args:
-        acc_info (dict): Account information
-        quote (str): Quote currency for valuation
+    API_KEY = os.environ.get('STRATEGY_API_KEY', '')
+    SECRET_KEY = os.environ.get('STRATEGY_API_SECRET', '')
+    PASSPHRASE = os.environ.get('STRATEGY_PASSPHRASE', '')
+    SESSION_ID = os.environ.get('STRATEGY_SESSION_KEY', '')
+    ASSET_FILTER = os.environ.get('STRATEGY_ASSET_FILTER', '')
+
+    if not API_KEY or not SECRET_KEY:
+        error_result = {
+            "Total": 0.0
+        }
+       
         
-    Returns:
-        dict: Portfolio snapshot
-    """
-    snapshot = PoloniexAccountSnapshot(acc_info)
-    return snapshot.take_snapshot(quote)
-
-
-# Example usage and testing
-if __name__ == "__main__":
-    example_acc_info = {
-        'api_key': '',
-        'secret_key': '',
-        'passphrase': ''  # Required for Poloniex
-    }
+        # Output JSON for Golang to parse
+        print("\n" + "="*50)
+        print("RESULT:")
+        print(json.dumps(error_result, indent=2))
+        return error_result
     
-    # Check if API credentials are provided
-    if not example_acc_info['api_key'] or not example_acc_info['secret_key']:
-        print("\n📝 Example usage:")
-        print("from init.poloniex import create_poloniex_account_snapshot")
-        print("")
-        print("# Create Poloniex account snapshot")
-        print("portfolio = create_poloniex_account_snapshot(")
-        print("    acc_info=account_info,")
-        print("    quote='USDT'")
-        print(")")
-        print("")
-        print("⚠️  Please provide Poloniex API credentials in the example_acc_info to get actual balances")
-        print("Note: Poloniex requires api_key, secret_key, and passphrase")
-        exit()
-    
-    # Get actual portfolio snapshot with real credentials
     try:
-        portfolio = create_poloniex_account_snapshot(example_acc_info, 'USDT')
-        print("\n📊 Poloniex Portfolio Snapshot (All balances converted to USDT):")
-        print(json.dumps(portfolio, indent=2))
+        # Initialize balance checker
+        checker = PoloniexBalanceChecker(
+            api_key=API_KEY,
+            secret_key=SECRET_KEY,
+            passphrase=PASSPHRASE,
+            session_id=SESSION_ID
+        )
+        
+        # Check balance
+        result = checker.check_balance(asset_filter=ASSET_FILTER if ASSET_FILTER else None)
+        
+        # Output JSON for Golang to parse
+        print("\n" + "="*50)
+        print("RESULT:")
+        print(json.dumps(result, indent=2))
+        
+        return result
+        
     except Exception as e:
-        print(f"❌ Error fetching Poloniex portfolio: {e}")
-        print("Note: Poloniex requires api_key, secret_key, and passphrase")
+        error_result = {
+            "Total": 0.0
+        }
+        print(f" Fatal error: {e}")
+        
+        print("\n" + "="*50)
+        print("RESULT:")
+        print(json.dumps(error_result, indent=2))
+        return error_result
+
+if __name__ == "__main__":
+    result = main()
+    sys.exit(0 if 'Total' in result else 1)

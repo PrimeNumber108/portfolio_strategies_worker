@@ -11,7 +11,6 @@ import time
 import json
 from decimal import Decimal
 
-# Add the parent directory to the path to import our modules
 CURRENT_DIR = os.path.dirname(os.path.abspath(__file__))
 PROJECT_ROOT = os.path.abspath(os.path.join(CURRENT_DIR, "../"))
 sys.path.insert(0, PROJECT_ROOT)
@@ -44,6 +43,10 @@ class BinanceBalanceChecker:
         
         # Initialize Binance client using the factory function
         try:
+            print(f"Initializing Binance client for session: {session_id}")
+            print(f"API Key: {api_key[:10]}... (truncated)")
+            print(f"API Secret: {secret_key[:10]}... (truncated)")
+            
             account_info = {
                 "api_key": api_key,
                 "secret_key": secret_key,
@@ -57,83 +60,117 @@ class BinanceBalanceChecker:
                 quote=self.quote,
                 use_proxy=False  # Disable proxy to avoid connection issues
             )
-            print(f"✅ Binance client initialized successfully for session: {session_id}")
+            print(f"Binance client initialized successfully for session: {session_id}")
+            print(f"Client type: {type(self.client)}")
+            print(f"Client methods: {[method for method in dir(self.client) if not method.startswith('_')]}")
             logger_database.info(f"Binance balance checker initialized for session: {session_id}")
         except Exception as e:
-            print(f"❌ Failed to initialize Binance client: {e}")
+            print(f"Failed to initialize Binance client: {e}")
+            print(f"Exception details: {type(e).__name__}: {str(e)}")
+            import traceback
+            print(f"Traceback: {traceback.format_exc()}")
             logger_error.error(f"Failed to initialize Binance client for session {session_id}: {e}")
             raise
 
     def get_all_balances(self):
         """
-        Get all account balances from Binance
+        Get all account balances from Binance using get_account_balance() and ticker prices
         
         Returns:
-            dict: Complete balance information for all assets
+            dict: Complete balance information for all assets with prices in the requested format
         """
         try:
-            print(f"📊 Fetching all account balances for session: {self.session_id}")
+            print(f"Fetching all account balances for session: {self.session_id}")
             logger_database.info(f"Fetching all account balances for session: {self.session_id}")
             
+            print(f"Calling client.get_account_balance()...")
             balance_data = self.client.get_account_balance()
+            print(f"Raw balance_data response: {balance_data}")
             
-            if balance_data and 'data' in balance_data:
-                balances = balance_data['data']
-                
-                # Format balance data for output
-                formatted_balances = []
-                total_value_usd = 0.0
-                
-                for asset_symbol, balance_info in balances.items():
-                    if balance_info['total'] > 0:
-                        asset_balance = {
-                            "asset": asset_symbol,
-                            "available": balance_info['available'],
-                            "locked": balance_info['locked'],
-                            "total": balance_info['total']
-                        }
-                        formatted_balances.append(asset_balance)
-                        
-                        # Add to total value if it's USDT
-                        if asset_symbol == "USDT":
-                            total_value_usd += balance_info['total']
-                        
-                        print(f"💰 {asset_symbol}: Available: {balance_info['available']:.8f}, Locked: {balance_info['locked']:.8f}, Total: {balance_info['total']:.8f}")
-                
-                result = {
-                    "success": True,
-                    "exchange": self.exchange,
-                    "session_id": self.session_id,
-                    "timestamp": int(time.time()),
-                    "balances": formatted_balances,
-                    "total_assets": len(formatted_balances),
-                    "total_value_usd": total_value_usd,
-                    "message": "Account balance retrieved successfully"
-                }
-                
-                print(f"✅ Successfully retrieved {len(formatted_balances)} assets with balance > 0")
-                logger_database.info(f"Successfully retrieved account balance for session: {self.session_id}")
-                return result
-                
-            else:
-                error_msg = "No balance data received from Binance API"
-                print(f"❌ {error_msg}")
+            if not balance_data or 'data' not in balance_data:
+                error_msg = f"No balance data received from get_account_balance() API. Response: {balance_data}"
+                print(f" {error_msg}")
                 logger_error.error(f"Balance fetch failed for session {self.session_id}: {error_msg}")
                 
                 return {
-                    "success": False,
-                    "exchange": self.exchange,
-                    "session_id": self.session_id,
-                    "timestamp": int(time.time()),
-                    "error": error_msg,
-                    "balances": [],
-                    "total_assets": 0,
-                    "total_value_usd": 0.0
+                    "Total": 0.0
                 }
+            
+            balances = balance_data['data']
+            print(f"Retrieved {len(balances)} assets from get_account_balance()")
+            print(f"Raw balances data: {balances}")
+            
+            # Format balance data with prices in the requested format
+            formatted_balances = {}
+            total_value_usd = 0.0
+            
+            for asset_symbol, asset_info in balances.items():
+                amount = float(asset_info.get('total', 0))
+                print(f"🔍 Processing {asset_symbol}: amount = {amount}")
+                
+                if amount > 0:
+                    try:
+                        # Get price for the asset
+                        if asset_symbol == 'USDT':
+                            price = 1.0
+                        else:
+                            # Try to get price using get_ticker method
+                            try:
+                                ticker_data = self.client.get_ticker(asset_symbol, "USDT")
+                                price = float(ticker_data.get('last', 0)) if ticker_data else 0.0
+                            except Exception as ticker_error:
+                                print(f"Could not get ticker for {asset_symbol}_USDT: {ticker_error}")
+                                # Try get_price method if available
+                                try:
+                                    # Create a temporary client with the asset as base
+                                    temp_client = get_client_exchange(
+                                        exchange_name="binance",
+                                        acc_info={
+                                            "api_key": self.client.api_key,
+                                            "secret_key": self.client.secret_key,
+                                            "passphrase": ""
+                                        },
+                                        symbol=asset_symbol,
+                                        quote="USDT",
+                                        use_proxy=False
+                                    )
+                                    price_data = temp_client.get_price()
+                                    price = float(price_data.get('price', 0)) if price_data else 0.0
+                                except Exception as price_error:
+                                    print(f"Could not get price for {asset_symbol}: {price_error}")
+                                    price = 0.0
+                        
+                        formatted_balances[asset_symbol] = {
+                            "amount": amount,
+                            "price": str(price)
+                        }
+                        
+                        # Calculate USD value
+                        usd_value = amount * price
+                        total_value_usd += usd_value
+                        
+                        print(f"💰 {asset_symbol}: Amount: {amount:.8f}, Price: ${price:.8f}, Value: ${usd_value:.2f}")
+                        
+                    except Exception as price_error:
+                        print(f"⚠️ Error processing {asset_symbol}: {price_error}")
+                        # Still add the asset with 0 price
+                        formatted_balances[asset_symbol] = {
+                            "amount": amount,
+                            "price": "0"
+                        }
+            
+            # Add total to the result as requested
+            formatted_balances["Total"] = total_value_usd
+         
+            logger_database.info(f"Successfully retrieved account balance for session: {self.session_id}")
+            return formatted_balances
                 
         except Exception as e:
             error_msg = f"Error fetching account balance: {str(e)}"
-            print(f"❌ {error_msg}")
+            print(f"{error_msg}")
+            print(f"Exception details: {type(e).__name__}: {str(e)}")
+            import traceback
+            print(f"Traceback: {traceback.format_exc()}")
             logger_error.error(f"Balance fetch exception for session {self.session_id}: {error_msg}")
             
             update_key_and_insert_error_log(
@@ -146,14 +183,7 @@ class BinanceBalanceChecker:
             )
             
             return {
-                "success": False,
-                "exchange": self.exchange,
-                "session_id": self.session_id,
-                "timestamp": int(time.time()),
-                "error": error_msg,
-                "balances": [],
-                "total_assets": 0,
-                "total_value_usd": 0.0
+                "Total": 0.0
             }
 
     def get_specific_asset_balance(self, asset_symbol):
@@ -187,13 +217,13 @@ class BinanceBalanceChecker:
                     "message": f"{asset_symbol} balance retrieved successfully"
                 }
                 
-                print(f"✅ {asset_symbol} balance: Available: {balance['available']:.8f}, Locked: {balance['locked']:.8f}, Total: {balance['total']:.8f}")
+                print(f"{asset_symbol} balance: Available: {balance['available']:.8f}, Locked: {balance['locked']:.8f}, Total: {balance['total']:.8f}")
                 logger_database.info(f"{asset_symbol} balance retrieved successfully for session: {self.session_id}")
                 return result
                 
             else:
                 error_msg = f"No {asset_symbol} balance found"
-                print(f"❌ {error_msg}")
+                print(f"{error_msg}")
                 logger_error.warning(f"{asset_symbol} balance not found for session {self.session_id}")
                 
                 return {
@@ -210,7 +240,7 @@ class BinanceBalanceChecker:
                 
         except Exception as e:
             error_msg = f"Error fetching {asset_symbol} balance: {str(e)}"
-            print(f"❌ {error_msg}")
+            print(f"{error_msg}")
             logger_error.error(f"{asset_symbol} balance fetch exception for session {self.session_id}: {error_msg}")
             
             update_key_and_insert_error_log(
@@ -242,7 +272,7 @@ class BinanceBalanceChecker:
             asset_filter (str, optional): Specific asset to check. If None, gets all balances.
             
         Returns:
-            dict: Balance information
+            dict: Balance information in the requested format
         """
         print("🚀 Starting Binance Balance Check...")
         print(f"📊 Session ID: {self.session_id}")
@@ -251,21 +281,27 @@ class BinanceBalanceChecker:
         
         try:
             if asset_filter:
+                # For specific asset, still return the old format for compatibility
                 result = self.get_specific_asset_balance(asset_filter)
+                print("-" * 50)
+                if result.get('success'):
+                    print("Balance check completed successfully!")
+                else:
+                    print("Balance check failed!")
+                return result
             else:
+                # For all balances, return the new format
                 result = self.get_all_balances()
-            
-            print("-" * 50)
-            if result['success']:
-                print("✅ Balance check completed successfully!")
-            else:
-                print("❌ Balance check failed!")
-                
-            return result
+                print("-" * 50)
+                if 'Total' in result:
+                    print("Balance check completed successfully!")
+                else:
+                    print("Balance check failed!")
+                return result
             
         except Exception as e:
             error_msg = f"Balance check error: {str(e)}"
-            print(f"❌ {error_msg}")
+            print(f"{error_msg}")
             logger_error.error(f"Balance check error for session {self.session_id}: {error_msg}")
             
             update_key_and_insert_error_log(
@@ -278,14 +314,7 @@ class BinanceBalanceChecker:
             )
             
             return {
-                "success": False,
-                "exchange": self.exchange,
-                "session_id": self.session_id,
-                "timestamp": int(time.time()),
-                "error": error_msg,
-                "balances": [],
-                "total_assets": 0,
-                "total_value_usd": 0.0
+                "Total": 0.0
             }
 
 def main():
@@ -294,7 +323,6 @@ def main():
     """
     print("🔍 Running Binance Balance Checker...")
     
-    # Get API credentials from environment variables
     API_KEY = os.environ.get('STRATEGY_API_KEY', '')
     SECRET_KEY = os.environ.get('STRATEGY_API_SECRET', '')
     PASSPHRASE = os.environ.get('STRATEGY_PASSPHRASE', '')  # Not used for Binance
@@ -303,25 +331,16 @@ def main():
 
     if not API_KEY or not SECRET_KEY:
         error_result = {
-            "success": False,
-            "exchange": "binance",
-            "session_id": SESSION_ID,
-            "timestamp": int(time.time()),
-            "error": "API credentials not provided",
-            "balances": [],
-            "total_assets": 0,
-            "total_value_usd": 0.0
+            "Total": 0.0
         }
        
         
-        # Output JSON for Golang to parse
         print("\n" + "="*50)
         print("RESULT:")
         print(json.dumps(error_result, indent=2))
         return error_result
     
     try:
-        # Initialize balance checker
         checker = BinanceBalanceChecker(
             api_key=API_KEY,
             secret_key=SECRET_KEY,
@@ -329,7 +348,6 @@ def main():
             session_id=SESSION_ID
         )
         
-        # Check balance
         result = checker.check_balance(asset_filter=ASSET_FILTER if ASSET_FILTER else None)
         
         # Output JSON for Golang to parse
@@ -341,16 +359,9 @@ def main():
         
     except Exception as e:
         error_result = {
-            "success": False,
-            "exchange": "binance",
-            "session_id": SESSION_ID,
-            "timestamp": int(time.time()),
-            "error": f"Fatal error: {str(e)}",
-            "balances": [],
-            "total_assets": 0,
-            "total_value_usd": 0.0
+            "Total": 0.0
         }
-        print(f"❌ Fatal error: {e}")
+        print(f"Fatal error: {e}")
         
         # Output JSON for Golang to parse
         print("\n" + "="*50)
@@ -360,4 +371,4 @@ def main():
 
 if __name__ == "__main__":
     result = main()
-    sys.exit(0 if result.get('success', False) else 1)
+    sys.exit(0 if 'Total' in result else 1)
