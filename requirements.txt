@@ -12,26 +12,26 @@ polars
 plotly
 hftbacktest
 
-hft_strat
+#hft_strat ##not public
 hmmlearn
 yfinance
 statsmodels
-algo_deploy
+#algo_deploy ##not in PyPi
 pandas_ta
 hurst
 hmmlearn
 binance_historical_data
 binance_bulk_downloader
 pandas_ta
-talib
+#talib
 arch
-trades_from_signal
+#trades_from_signal
 indicator
 vnstock
-pypfopt
+#pypfopt
 PyPortfolioOpt
 filterpy
-google-colab
+#google-colab
 mplfinance
 quantstats
-fetch_data_binance
+#fetch_data_binance
