@@ -10,6 +10,7 @@ import os
 import importlib.util
 import traceback
 from pathlib import Path
+from logger import logger_access, logger_error
 
 def configure_matplotlib_for_notebook():
     """Configure matplotlib for notebook execution (plots will be embedded in notebook)"""
@@ -26,26 +27,26 @@ def configure_matplotlib_for_notebook():
         plt.rcParams['savefig.bbox'] = 'tight'
         plt.rcParams['savefig.facecolor'] = 'white'
         
-        print("✅ Matplotlib configured for notebook execution")
+        logger_access.info("✅ Matplotlib configured for notebook execution")
             
     except ImportError:
-        print("⚠️ Matplotlib not available")
+        logger_access.error("⚠️ Matplotlib not available")
     except Exception as e:
-        print(f"⚠️ Failed to configure matplotlib: {e}")
+        logger_access.error(f"⚠️ Failed to configure matplotlib: {e}")
 
 def load_config(config_path):
     """Load strategy configuration from JSON file"""
     try:
         with open(config_path, 'r') as f:
             config = json.load(f)
-        print(f"✅ Configuration loaded successfully")
-        print(f"📊 Session: {config.get('session_key', 'N/A')}")
-        print(f"🎯 Strategy: {config.get('strategy_name', 'N/A')}")
-        print(f"🏦 Exchange: {config.get('exchange', 'N/A')}")
-        print(f"💰 Initial Balance: ${config.get('initial_balance', 0):,.2f}")
+        logger_access.info(f"✅ Configuration loaded successfully")
+        logger_access.info(f"📊 Session: {config.get('session_key', 'N/A')}")
+        logger_access.info(f"🎯 Strategy: {config.get('strategy_name', 'N/A')}")
+        logger_access.info(f"🏦 Exchange: {config.get('exchange', 'N/A')}")
+        logger_access.info(f"💰 Initial Balance: ${config.get('initial_balance', 0):,.2f}")
         return config
     except Exception as e:
-        print(f"❌ Error loading config: {e}")
+        logger_access.error(f"❌ Error loading config: {e}")
         return None
 
 def find_strategy_directory(strategy_name):
@@ -53,7 +54,7 @@ def find_strategy_directory(strategy_name):
     strategies_dir = Path(__file__).parent / "strategies"
     
     if not strategies_dir.exists():
-        print(f"❌ Strategies directory not found: {strategies_dir}")
+        logger_access.info(f"❌ Strategies directory not found: {strategies_dir}")
         return None
     
     # Look for strategy folder matching the name
@@ -64,14 +65,14 @@ def find_strategy_directory(strategy_name):
             notebook_files = list(strategy_dir.glob("*.ipynb"))
             
             if python_files or notebook_files:
-                print(f"✅ Found strategy directory: {strategy_dir}")
+                logger_access.info(f"✅ Found strategy directory: {strategy_dir}")
                 if python_files:
-                    print(f"📁 Contains {len(python_files)} Python files")
+                    logger_access.info(f"📁 Contains {len(python_files)} Python files")
                 if notebook_files:
-                    print(f"📓 Contains {len(notebook_files)} Jupyter notebooks")
+                    logger_access.info(f"📓 Contains {len(notebook_files)} Jupyter notebooks")
                 return strategy_dir
     
-    print(f"❌ Strategy directory not found for: {strategy_name}")
+    logger_access.info(f"❌ Strategy directory not found for: {strategy_name}")
     return None
 
 def find_all_python_files(strategy_dir):
@@ -102,21 +103,21 @@ def is_valid_notebook(notebook_path):
             return False
         return True
     except Exception as e:
-        print(f"⚠️  Invalid notebook {notebook_path}: {e}")
+        logger_access.error(f"⚠️  Invalid notebook {notebook_path}: {e}")
         return False
 
 def execute_notebook_file(notebook_path, config):
     """Execute a Jupyter notebook with the given configuration"""
     try:
-        print(f"📓 Executing notebook file: {notebook_path}")
+        logger_access.info(f"📓 Executing notebook file: {notebook_path}")
         
         # Check if required packages are available
         try:
             import nbformat
             from nbconvert.preprocessors import ExecutePreprocessor
         except ImportError as e:
-            print(f"❌ Required packages not installed: {e}")
-            print("💡 Please install: pip install nbformat nbconvert jupyter")
+            logger_access.error(f"❌ Required packages not installed: {e}")
+            logger_access.error("💡 Please install: pip install nbformat nbconvert jupyter")
             return False
         
         # Configure matplotlib for notebook execution
@@ -150,24 +151,24 @@ def execute_notebook_file(notebook_path, config):
         # Remove existing executed file if it exists
         if output_path.exists():
             output_path.unlink()
-            print(f"🗑️  Removed existing executed file: {output_path}")
+            logger_access.info(f"🗑️  Removed existing executed file: {output_path}")
         
         # Create new executed file
         with open(output_path, 'w') as f:
             nbformat.write(nb, f)
         
-        print(f"✅ Notebook executed successfully! Output saved to: {output_path}")
+        logger_access.info(f"✅ Notebook executed successfully! Output saved to: {output_path}")
         return True
         
     except Exception as e:
-        print(f"❌ Error executing notebook {notebook_path}: {e}")
-        print(f"📋 Traceback:\n{traceback.format_exc()}")
+        logger_access.error(f"❌ Error executing notebook {notebook_path}: {e}")
+        logger_access.error(f"📋 Traceback:\n{traceback.format_exc()}")
         return False
 
 def execute_strategy_file(script_path, config):
     """Execute a single strategy script with the given configuration"""
     try:
-        print(f"🚀 Executing strategy file: {script_path}")
+        logger_access.info(f"🚀 Executing strategy file: {script_path}")
         
         # Configure matplotlib for notebook execution
         configure_matplotlib_for_notebook()
@@ -194,18 +195,18 @@ def execute_strategy_file(script_path, config):
         
         # Look for main function or strategy class
         if hasattr(strategy_module, 'main'):
-            print("📞 Calling main() function...")
+            logger_access.info("📞 Calling main() function...")
             result = strategy_module.main()
-            print(f"✅ Strategy file execution completed with result: {result}")
+            logger_access.info(f"✅ Strategy file execution completed with result: {result}")
             return True
         else:
-            print("⚠️  No main() function found, executing module directly...")
-            print("✅ Strategy module executed successfully")
+            logger_access.info("⚠️  No main() function found, executing module directly...")
+            logger_access.info("✅ Strategy module executed successfully")
             return True
             
     except Exception as e:
-        print(f"❌ Error executing strategy file {script_path}: {e}")
-        print(f"📋 Traceback:\n{traceback.format_exc()}")
+        logger_access.error(f"❌ Error executing strategy file {script_path}: {e}")
+        logger_access.error(f"📋 Traceback:\n{traceback.format_exc()}")
         return False
 
 def execute_all_strategies(strategy_dir, config):
@@ -219,32 +220,32 @@ def execute_all_strategies(strategy_dir, config):
         if is_valid_notebook(notebook):
             valid_notebooks.append(notebook)
         else:
-            print(f"⚠️  Skipping invalid notebook: {notebook.name}")
+            logger_access.info(f"⚠️  Skipping invalid notebook: {notebook.name}")
     
     total_files = len(python_files) + len(valid_notebooks)
     
     if total_files == 0:
-        print("⚠️  No executable files found in strategy directory")
+        logger_access.info("⚠️  No executable files found in strategy directory")
         return False
     
-    print(f"🎯 Found executable files:")
+    logger_access.info(f"🎯 Found executable files:")
     if python_files:
-        print(f"  📁 {len(python_files)} Python files:")
+        logger_access.info(f"  📁 {len(python_files)} Python files:")
         for file in python_files:
-            print(f"    - {file.name}")
+            logger_access.info(f"    - {file.name}")
     if valid_notebooks:
-        print(f"  📓 {len(valid_notebooks)} Jupyter notebooks:")
+        logger_access.info(f"  📓 {len(valid_notebooks)} Jupyter notebooks:")
         for file in valid_notebooks:
-            print(f"    - {file.name}")
+            logger_access.info(f"    - {file.name}")
     
     success_count = 0
     failed_files = []
     
     # Execute Python files first (they have priority)
     for script_path in python_files:
-        print(f"\n{'='*60}")
-        print(f"🔄 Executing Python file: {script_path.name}")
-        print(f"{'='*60}")
+        logger_access.info(f"\n{'='*60}")
+        logger_access.info(f"🔄 Executing Python file: {script_path.name}")
+        logger_access.info(f"{'='*60}")
         
         if execute_strategy_file(script_path, config):
             success_count += 1
@@ -254,38 +255,38 @@ def execute_all_strategies(strategy_dir, config):
     # Execute notebooks if no Python files or if Python files failed
     if not python_files or success_count == 0:
         for notebook_path in valid_notebooks:
-            print(f"\n{'='*60}")
-            print(f"🔄 Executing Jupyter notebook: {notebook_path.name}")
-            print(f"{'='*60}")
+            logger_access.info(f"\n{'='*60}")
+            logger_access.info(f"🔄 Executing Jupyter notebook: {notebook_path.name}")
+            logger_access.info(f"{'='*60}")
             
             if execute_notebook_file(notebook_path, config):
                 success_count += 1
             else:
                 failed_files.append(notebook_path.name)
     else:
-        print(f"\n📓 Skipping notebooks since Python files were executed successfully")
+        logger_access.info(f"\n📓 Skipping notebooks since Python files were executed successfully")
     
-    print(f"\n{'='*60}")
-    print(f"📊 Execution Summary:")
-    print(f"✅ Successfully executed: {success_count}/{total_files} files")
+    logger_access.info(f"\n{'='*60}")
+    logger_access.info(f"📊 Execution Summary:")
+    logger_access.info(f"✅ Successfully executed: {success_count}/{total_files} files")
     if failed_files:
-        print(f"❌ Failed files: {', '.join(failed_files)}")
-    print(f"{'='*60}")
+        logger_access.info(f"❌ Failed files: {', '.join(failed_files)}")
+    logger_access.info(f"{'='*60}")
     
     return success_count > 0
 
 def main():
     """Main function"""
-    print("🎯 Strategy Runner Starting...")
-    print("=" * 50)
+    logger_access.info("🎯 Strategy Runner Starting...")
+    logger_access.info("=" * 50)
     
     # Check command line arguments
     if len(sys.argv) < 2:
-        print("❌ Usage: python3 strategy_runner.py <config_file>")
+        logger_access.info("❌ Usage: python3 strategy_runner.py <config_file>")
         return 1
     
     config_path = sys.argv[1]
-    print(f"📁 Config file: {config_path}")
+    logger_access.info(f"📁 Config file: {config_path}")
     
     # Load configuration
     config = load_config(config_path)
@@ -293,20 +294,20 @@ def main():
         return 1
     
     # For now, just print "Hello World" and config info
-    print("\n" + "=" * 50)
-    print("🌍 Hello World from Python Strategy Runner!")
-    print("=" * 50)
+    logger_access.info("\n" + "=" * 50)
+    logger_access.info("🌍 Hello World from Python Strategy Runner!")
+    logger_access.info("=" * 50)
     
-    print(f"📊 Session Key: {config.get('session_key', 'N/A')}")
-    print(f"🎯 Strategy Name: {config.get('strategy_name', 'N/A')}")
-    print(f"📝 Strategy Code: {config.get('strategy_code', 'N/A')}")
-    print(f"👤 Username: {config.get('username', 'N/A')}")
-    print(f"🏦 Exchange: {config.get('exchange', 'N/A')}")
-    print(f"💰 Initial Balance: ${config.get('initial_balance', 0):,.2f}")
-    print(f"⚡ Risk Level: {config.get('risk_level', 'N/A')}")
-    print(f"📈 Asset Class: {config.get('asset_class', 'N/A')}")
-    print(f"⏰ Timeframe: {config.get('timeframe', 'N/A')}")
-    print(f"🕐 Start Time: {config.get('start_time', 'N/A')}")
+    logger_access.info(f"📊 Session Key: {config.get('session_key', 'N/A')}")
+    logger_access.info(f"🎯 Strategy Name: {config.get('strategy_name', 'N/A')}")
+    logger_access.info(f"📝 Strategy Code: {config.get('strategy_code', 'N/A')}")
+    logger_access.info(f"👤 Username: {config.get('username', 'N/A')}")
+    logger_access.info(f"🏦 Exchange: {config.get('exchange', 'N/A')}")
+    logger_access.info(f"💰 Initial Balance: ${config.get('initial_balance', 0):,.2f}")
+    logger_access.info(f"⚡ Risk Level: {config.get('risk_level', 'N/A')}")
+    logger_access.info(f"📈 Asset Class: {config.get('asset_class', 'N/A')}")
+    logger_access.info(f"⏰ Timeframe: {config.get('timeframe', 'N/A')}")
+    logger_access.info(f"🕐 Start Time: {config.get('start_time', 'N/A')}")
     
     # Find and execute strategy directory
     strategy_name = config.get('strategy_name', '')
@@ -315,26 +316,28 @@ def main():
     strategy_dir_env = os.environ.get('STRATEGY_DIR')
     if strategy_dir_env:
         strategy_dir = Path(strategy_dir_env)
-        print(f"🔍 Using strategy directory from environment: {strategy_dir}")
+        logger_access.info(f"🔍 Using strategy directory from environment: {strategy_dir}")
     elif strategy_name:
         strategy_dir = find_strategy_directory(strategy_name)
     else:
         strategy_dir = None
     
+    logger_access.info(f"🔍 Strategy directory: {strategy_dir}")
     if strategy_dir and strategy_dir.exists():
         success = execute_all_strategies(strategy_dir, config)
         if success:
-            print("\n✅ All strategy files executed successfully!")
+            logger_access.info("\n✅ All strategy files executed successfully!")
             return 0
         else:
-            print("\n❌ Strategy execution failed!")
+            logger_access.info("\n❌ Strategy execution failed!")
             return 1
     else:
-        print(f"\n⚠️  Strategy directory not found, running in demo mode")
+        logger_access.info(f"\n⚠️  Strategy directory not found, running in demo mode")
     
-    print("\n🎉 Demo execution completed successfully!")
-    print("=" * 50)
+    logger_access.info("\n🎉 Demo execution completed successfully!")
+    logger_access.info("=" * 50)
     return 0
 
 if __name__ == "__main__":
+    logger_access.info("=" * 50)
     exit(main())
