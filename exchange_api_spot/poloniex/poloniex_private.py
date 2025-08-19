@@ -386,6 +386,8 @@ class PoloniexPrivate:
             
         body = {}
         body.update(params_map)
+
+        
         result = self._request('POST', '/orders', True, body=body)
         print('result test: ',result)
         
@@ -413,6 +415,7 @@ class PoloniexPrivate:
                     status=result.get('state', '') or result.get('status', '')
                 )
                 
+
                 print(f"✅ Order {result['id']} stored in both Poloniex and Golang API")
                 
             except Exception as e:

@@ -29,7 +29,7 @@ from utils import (
 
 
 class BTCTestStrategy:
-    def __init__(self, api_key="", secret_key="", passphrase="", session_id=""):
+    def __init__(self, api_key="", secret_key="", passphrase="", session_id="", exchange=""):
         """
         Initialize the BTC test strategy
         
@@ -43,8 +43,8 @@ class BTCTestStrategy:
         self.quote = "USDT"
         self.price_threshold = 90000  # $90k USD (changed from 100k)
         self.buy_amount = 0.0001  # Amount of BTC to buy (adjust as needed)
-        self.exchange = "poloniex"
         self.run_key = generate_random_string()
+        self.exchange = exchange
         
         # Initialize Poloniex client using get_client_exchange
         try:
@@ -56,7 +56,7 @@ class BTCTestStrategy:
             }
             
             self.client = get_client_exchange(
-                exchange_name="poloniex",
+                exchange_name=self.exchange,
                 acc_info=account_info,
                 symbol=self.symbol,
                 quote=self.quote,
@@ -253,7 +253,8 @@ def main():
     SECRET_KEY = os.environ.get("STRATEGY_API_SECRET", "")
     PASSPHRASE = os.environ.get("STRATEGY_PASSPHRASE", "")
     SESSION_ID = os.environ.get("STRATEGY_SESSION_KEY", "")
-  
+    EXCHANGE = os.environ.get("EXCHANGE", "")
+
     if not API_KEY or not SECRET_KEY:
         print("❌ Please set your Poloniex API credentials in environment variables:")
         print("   STRATEGY_API_KEY")
@@ -271,7 +272,8 @@ def main():
             api_key=API_KEY,
             secret_key=SECRET_KEY,
             passphrase=PASSPHRASE,
-            session_id=SESSION_ID
+            session_id=SESSION_ID,
+            exchange=EXCHANGE,
         )
         
         print(f"🎯 Strategy initialized - Target price: ${strategy.price_threshold:,}")

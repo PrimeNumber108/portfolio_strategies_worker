@@ -525,12 +525,15 @@ class BinanceFuturePrivate:
         return base_inventory, quote_inventory, quote_usdt_inventory, quote_bnb_inventory 
 
 
-    def get_position_info(self,symbol):
+    def get_position_info(self,symbol = "",quote = 'USDT'):
         """Fetch the position information for a given symbol."""
         try:
             # Fetch account position info
             positions = self.trade.futures_position_information()
-            # print(positions)
+            if symbol != "":
+                symbol = f'{symbol}{quote}'
+            else:
+                symbol = self.symbol_ex
             # Find the relevant position
             for pos in positions:
                 if pos['symbol'] == symbol:
@@ -539,8 +542,8 @@ class BinanceFuturePrivate:
                         "positionAmt": float(pos['positionAmt']),  # Position size
                         "entryPrice": float(pos['entryPrice']),  # Average entry price
                         "unRealizedProfit": float(pos['unRealizedProfit']),  # Unrealized PnL
-                        "leverage": float(pos['leverage']),  # Leverage
-                        "marginType": pos['marginType'],  # Margin type (cross/isolated)
+                        "leverage": float(pos.get('leverage', 0)),  # Leverage (0 if not found)
+                        "marginType": pos.get('marginType', ""),          # Margin type
                         "liquidationPrice": float(pos['liquidationPrice']),  # Liquidation price
                     }
             

@@ -16,6 +16,7 @@ sys.path.insert(0, PROJECT_ROOT)
 from exchange_api_spot.binance.binance_private_new import BinancePrivateNew
 from exchange_api_spot.binance.binance_private import BinancePrivate
 from exchange_api_spot.poloniex.poloniex_private import PoloniexPrivate
+from exchange_api_spot.paper_trade.paper_trade import PaperTrade
 
 # Global dictionary to cache client instances
 clients_dict = {}
@@ -104,6 +105,19 @@ def get_client_exchange(exchange_name, acc_info='', symbol='BTC', quote="USDT", 
         elif exchange_name == 'bybit':
             # Placeholder for BybitPrivate when available
             raise NotImplementedError(f"Exchange '{exchange_name}' is not yet implemented")
+            
+        elif exchange_name == 'paper_trade' or exchange_name == 'paper':
+            # Paper trading - no real money involved
+            initial_balance = acc_info.get('initial_balance', 10000)  # Default $10,000 balance
+            client = PaperTrade(
+                symbol=symbol,
+                quote=quote,
+                api_key=acc_info.get('api_key', 'paper_trade'),
+                secret_key=acc_info.get('secret_key', 'paper_trade'),
+                passphrase=acc_info.get('passphrase', ''),
+                session_key=acc_info.get('session_key', ''),
+                initial_balance=initial_balance
+            )
             
         else:
             raise ValueError(f"Unsupported exchange: {exchange_name}")
