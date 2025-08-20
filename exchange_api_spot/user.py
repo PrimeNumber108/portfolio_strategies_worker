@@ -18,7 +18,9 @@ from exchange_api_spot.binance.binance_private import BinancePrivate
 from exchange_api_spot.poloniex.poloniex_private import PoloniexPrivate
 from exchange_api_spot.paper_trade.paper_trade import PaperTrade
 
-# Global dictionary to cache client instances
+EXCHANGE = os.environ.get("EXCHANGE", "")
+PAPER_MODE = os.environ.get("PAPER_TRADING", "")
+
 clients_dict = {}
 
 def get_client_exchange(exchange_name, acc_info='', symbol='BTC', quote="USDT", use_proxy=False):
@@ -36,7 +38,7 @@ def get_client_exchange(exchange_name, acc_info='', symbol='BTC', quote="USDT", 
         Exchange client instance or None if exchange not supported
     """
     client = None
-    
+    exchange_name = EXCHANGE
     try:
         # Check if client already exists in cache
         if acc_info and "api_key" in acc_info and acc_info["api_key"] in clients_dict:
@@ -106,7 +108,7 @@ def get_client_exchange(exchange_name, acc_info='', symbol='BTC', quote="USDT", 
             # Placeholder for BybitPrivate when available
             raise NotImplementedError(f"Exchange '{exchange_name}' is not yet implemented")
             
-        elif exchange_name == 'paper_trade' or exchange_name == 'paper':
+        elif  PAPER_MODE == True:
             # Paper trading - no real money involved
             initial_balance = acc_info.get('initial_balance', 10000)  # Default $10,000 balance
             client = PaperTrade(
@@ -116,7 +118,8 @@ def get_client_exchange(exchange_name, acc_info='', symbol='BTC', quote="USDT", 
                 secret_key=acc_info.get('secret_key', 'paper_trade'),
                 passphrase=acc_info.get('passphrase', ''),
                 session_key=acc_info.get('session_key', ''),
-                initial_balance=initial_balance
+                initial_balance=initial_balance,
+                exchange=exchange_name
             )
             
         else:

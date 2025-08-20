@@ -14,6 +14,7 @@ import requests
 from decimal import Decimal
 from typing import Dict, Optional, Any, List
 import redis
+from exchange_api_spot.user import get_client_exchange
 
 # Add the parent directory to the path to import our modules
 CURRENT_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -44,7 +45,7 @@ class PaperTrade:
     """
     
     def __init__(self, symbol='BTC', quote='USDT', api_key='', secret_key='', 
-                 passphrase='', session_key='', initial_balance=10000):
+                 passphrase='', session_key='', initial_balance=10000, exchange='binance'):
         """
         Initialize paper trading client
         
@@ -65,6 +66,7 @@ class PaperTrade:
         self.api_key = api_key or 'paper_trade'
         self.secret_key = secret_key or 'paper_trade'
         self.session_key = session_key or str(uuid.uuid4())
+        self.exchange = exchange
         self.r = r
         
         # Get exchange from environment variable (default to binance if not set)
@@ -170,7 +172,7 @@ class PaperTrade:
 
     def get_scale(self, base='', quote='') -> tuple:
         """
-        Get price and quantity scales from Redis cache
+        Get price and quantity scales from exchange first, then Redis cache as fallback
         
         Args:
             base (str): Base currency
@@ -183,7 +185,41 @@ class PaperTrade:
             symbol = f'{base}_{quote}' if base else self.symbol_ex
             symbol_redis = symbol.upper()
             
-            # Try to get from Redis first
+            # First try to get from actual exchange using get_client_exchange
+            try:
+                acc_info = {
+                    'api_key': 'demo_key',
+                    'secret_key': 'demo_secret',
+                    'passphrase': ''
+                }
+                
+                exchange_client = get_client_exchange(
+                    exchange_name=self.exchange,
+                    acc_info=acc_info,
+                    symbol=base or self.base,
+                    quote=quote or self.quote
+                )
+                
+                if exchange_client and hasattr(exchange_client, 'get_scale'):
+                    price_scale, qty_scale = exchange_client.get_scale(base, quote)
+                    
+                    # Cache the result in Redis for future use
+                    scale_json = json.dumps({'priceScale': price_scale, 'qtyScale': qty_scale})
+                    scale_key = f'{symbol_redis}_{self.exchange}_scale'
+                    self.r.set(scale_key, scale_json)
+                    
+                    # Cache in instance variables
+                    if not base:  # If getting for main symbol
+                        self.price_scale = price_scale
+                        self.qty_scale = qty_scale
+                    
+                    print(f"📊 Got scales from {self.exchange} exchange - Price: {price_scale}, Qty: {qty_scale}")
+                    return price_scale, qty_scale
+                        
+            except Exception as e:
+                print(f"⚠️ Could not get scales from {self.exchange} exchange: {e}")
+            
+            # Fallback to Redis cache
             scale_key = f'{symbol_redis}_{self.exchange}_scale'
             scale_data = self.r.get(scale_key)
             
@@ -196,13 +232,11 @@ class PaperTrade:
                 if not base:  # If getting for main symbol
                     self.price_scale = price_scale
                     self.qty_scale = qty_scale
-                    # Store in Redis for future use
-                    scale_json = json.dumps({'priceScale': price_scale, 'qtyScale': qty_scale})
-                    self.r.set(f'{self.symbol_redis}_{self.exchange}_scale', scale_json)
                 
+                print(f"📊 Got scales from Redis cache - Price: {price_scale}, Qty: {qty_scale}")
                 return price_scale, qty_scale
             else:
-                print(f"⚠️ No scale data found for {symbol_redis}_{self.exchange}")
+                print(f"⚠️ No scale data found for {symbol_redis}_{self.exchange}, using defaults")
                 return 2, 6  # Default scales
                 
         except Exception as e:
@@ -212,20 +246,49 @@ class PaperTrade:
 
     def get_price(self, base='', quote='') -> Dict[str, Any]:
         """
-        Get current price from Redis cache
+        Get current price from exchange first, then Redis cache as fallback
         
         Args:
             base (str): Base currency
             quote (str): Quote currency
             
         Returns:
-            dict: Price data from Redis or None if not available
+            dict: Price data from exchange or Redis cache
         """
         try:
             symbol = f'{base}_{quote}' if base else self.symbol_ex
             symbol_redis = symbol.upper()
             
-            # Try different Redis keys for price data
+            # First try to get from actual exchange using get_client_exchange
+            try:
+                acc_info = {
+                    'api_key': 'demo_key',
+                    'secret_key': 'demo_secret',
+                    'passphrase': ''
+                }
+                
+                exchange_client = get_client_exchange(
+                    exchange_name=self.exchange,
+                    acc_info=acc_info,
+                    symbol=base or self.base,
+                    quote=quote or self.quote
+                )
+                
+                if exchange_client and hasattr(exchange_client, 'get_price'):
+                    price_data = exchange_client.get_price(base, quote)
+                    
+                    if price_data:
+                        # Cache the result in Redis for future use
+                        price_key = f'{symbol_redis}_{self.exchange}_price'
+                        self.r.set(price_key, json.dumps(price_data))
+                        
+                        print(f"💰 Got price from {self.exchange} exchange: {price_data.get('price', 'N/A')}")
+                        return price_data
+                        
+            except Exception as e:
+                print(f"⚠️ Could not get price from {self.exchange} exchange: {e}")
+            
+            # Fallback to Redis cache
             price_keys = [
                 f'{symbol_redis}_{self.exchange}_price',
                 f'{symbol_redis}_{self.exchange}_ticker',
@@ -240,17 +303,22 @@ class PaperTrade:
                         # Handle different data formats
                         if isinstance(data, dict):
                             if 'price' in data:
+                                print(f"💰 Got price from Redis cache: {data['price']}")
                                 return {'price': str(data['price']), 'ts': int(time.time() * 1000)}
                             elif 'last' in data:
+                                print(f"💰 Got price from Redis cache: {data['last']}")
                                 return {'price': str(data['last']), 'ts': int(time.time() * 1000)}
                             elif 'lastPr' in data:
+                                print(f"💰 Got price from Redis cache: {data['lastPr']}")
                                 return {'price': str(data['lastPr']), 'ts': int(time.time() * 1000)}
                         elif isinstance(data, (int, float, str)):
+                            print(f"💰 Got price from Redis cache: {data}")
                             return {'price': str(data), 'ts': int(time.time() * 1000)}
                     except json.JSONDecodeError:
                         # If it's a plain number string
                         try:
                             float(price_data)
+                            print(f"💰 Got price from Redis cache: {price_data}")
                             return {'price': str(price_data), 'ts': int(time.time() * 1000)}
                         except ValueError:
                             continue
@@ -265,31 +333,62 @@ class PaperTrade:
 
     def get_ticker(self, base='', quote='') -> Dict[str, Any]:
         """
-        Get ticker data from Redis cache
+        Get ticker data from exchange first, then Redis cache as fallback
         
         Args:
             base (str): Base currency
             quote (str): Quote currency
             
         Returns:
-            dict: Ticker data from Redis
+            dict: Ticker data from exchange or Redis cache
         """
         try:
             symbol = f'{base}_{quote}' if base else self.symbol_ex
             symbol_redis = symbol.upper()
             
+            # First try to get from actual exchange using get_client_exchange
+            try:
+                acc_info = {
+                    'api_key': 'demo_key',
+                    'secret_key': 'demo_secret',
+                    'passphrase': ''
+                }
+                
+                exchange_client = get_client_exchange(
+                    exchange_name=self.exchange,
+                    acc_info=acc_info,
+                    symbol=base or self.base,
+                    quote=quote or self.quote
+                )
+                
+                if exchange_client and hasattr(exchange_client, 'get_ticker'):
+                    ticker_data = exchange_client.get_ticker(base, quote)
+                    
+                    if ticker_data and isinstance(ticker_data, dict):
+                        # Cache the result in Redis for future use
+                        ticker_key = f'{symbol_redis}_{self.exchange}_ticker'
+                        self.r.set(ticker_key, json.dumps(ticker_data))
+                        
+                        print(f"📊 Got ticker from {self.exchange} exchange")
+                        return ticker_data
+                        
+            except Exception as e:
+                print(f"⚠️ Could not get ticker from {self.exchange} exchange: {e}")
+            
+            # Fallback to Redis cache
             ticker_key = f'{symbol_redis}_{self.exchange}_ticker'
             ticker_data = self.r.get(ticker_key)
             
             if ticker_data:
                 data = json.loads(ticker_data)
                 if isinstance(data, dict):
+                    print(f"📊 Got ticker from Redis cache")
                     return data
             
             # Fallback to price data if ticker not available
             price_data = self.get_price(base, quote)
             if price_data:
-                return {
+                ticker = {
                     "ts": price_data.get("ts", int(time.time() * 1000)),
                     "last": price_data.get("price", "0"),
                     "lastPr": price_data.get("price", "0"),
@@ -298,6 +397,8 @@ class PaperTrade:
                     "baseVolume": "0",
                     "quoteVolume": "0"
                 }
+                print(f"📊 Generated ticker from price data")
+                return ticker
             
             print(f"⚠️ No ticker data found for {symbol_redis}_{self.exchange}")
             return {}
@@ -309,7 +410,7 @@ class PaperTrade:
 
     def get_candles(self, base='', quote='', interval='1h', limit=200, start_time=0) -> Dict[str, Any]:
         """
-        Get candle data from Redis cache
+        Get candle data from exchange first, then Redis cache as fallback
         
         Args:
             base (str): Base currency
@@ -319,12 +420,41 @@ class PaperTrade:
             start_time (int): Start time
             
         Returns:
-            dict: Candle data
+            dict: Candle data from exchange or Redis cache
         """
         try:
             symbol = f'{base}_{quote}' if base else self.symbol_ex
             symbol_redis = symbol.upper()
             
+            # First try to get from actual exchange using get_client_exchange
+            try:
+                acc_info = {
+                    'api_key': 'demo_key',
+                    'secret_key': 'demo_secret',
+                    'passphrase': ''
+                }
+                
+                exchange_client = get_client_exchange(
+                    exchange_name=self.exchange,
+                    acc_info=acc_info,
+                    symbol=base or self.base,
+                    quote=quote or self.quote
+                )
+                
+                if exchange_client and hasattr(exchange_client, 'get_candles'):
+                    candle_data = exchange_client.get_candles(base, quote, interval, limit, start_time)
+                    
+                    if candle_data and isinstance(candle_data, dict) and 'candle' in candle_data:
+                        # Cache the result in Redis for future use (optional, as candles are large)
+                        # We could implement caching here if needed
+                        
+                        print(f"📈 Got {len(candle_data.get('candle', []))} candles from {self.exchange} exchange")
+                        return candle_data
+                        
+            except Exception as e:
+                print(f"⚠️ Could not get candles from {self.exchange} exchange: {e}")
+            
+            # Fallback to Redis cache
             redis_klines = get_candle_data_info(
                 symbol_redis=symbol_redis, 
                 exchange_name=self.exchange, 
@@ -344,6 +474,7 @@ class PaperTrade:
                 else:
                     candles = candles[-limit:] if limit else candles
                 
+                print(f"📈 Got {len(candles)} candles from Redis cache")
                 return {
                     "ts": int(time.time() * 1000),
                     "candle": candles

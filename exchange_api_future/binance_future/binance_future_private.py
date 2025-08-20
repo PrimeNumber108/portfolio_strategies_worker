@@ -135,7 +135,7 @@ class BinanceFuturePrivate:
                 }
         return {'data':data} #result
        
-    def place_order(self, side_order, quantity,  order_type,force = 'normal', price ='', base = "", quote ="USDT"):
+    def place_order(self, side_order, quantity,  order_type = 'market',force = 'normal', price ='', base = "", quote ="USDT"):
         """
         Places an order on the Binance Futures exchange.
 
@@ -547,7 +547,7 @@ class BinanceFuturePrivate:
                         "liquidationPrice": float(pos['liquidationPrice']),  # Liquidation price
                     }
             
-            return f"No open position for {symbol}"
+            return None
 
         except Exception as e:
             return f"Error: {e}"

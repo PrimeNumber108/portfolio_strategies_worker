@@ -235,7 +235,7 @@ class BTCTestStrategy:
                 self.run_key,
                 self.symbol,
                 get_line_number(),
-                "POLONIEX",
+                self.exchange,
                 "test-strategy.py",
                 f"Strategy error: {e}"
             )
