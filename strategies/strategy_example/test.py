@@ -54,6 +54,7 @@ class BTCTestStrategy:
             }
             
             self.client = get_client_exchange(
+                exchange_name="poloniex",
                 acc_info=account_info,
                 symbol=self.symbol,
                 quote=self.quote,
@@ -65,7 +66,10 @@ class BTCTestStrategy:
             print(f"❌ Failed to initialize Poloniex client: {e}")
             logger_error.error(f"Failed to initialize Poloniex client: {e}")
             raise
-
+    
+    def get_account_balance(self):
+        balance = self.client.get_account_balance()
+        return balance
     def get_current_price(self):
         """
         Get current BTC price from Poloniex
@@ -255,6 +259,7 @@ def main():
         print("   STRATEGY_API_KEY")
         print("   STRATEGY_API_SECRET") 
         print("   STRATEGY_PASSPHRASE (optional)")
+        print("   STRATEGY_SESSION_KEY (optional)")
         return
     
     print("✅ Environment variables loaded successfully")
@@ -267,7 +272,8 @@ def main():
             secret_key=SECRET_KEY,
             passphrase=PASSPHRASE,
         )
-        
+        balance = strategy.get_account_balance()
+        print(f"💰 Account Balance: {balance}")
         print(f"🎯 Strategy initialized - Target price: ${strategy.price_threshold:,}")
         logger_database.info("BTC Test Strategy initialized successfully")
 

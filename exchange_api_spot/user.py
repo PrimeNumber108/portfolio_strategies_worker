@@ -24,12 +24,9 @@ from logger import logger_database, logger_error
 
 clients_dict = {}
 
-EXCHANGE = EXCHANGE.lower() if EXCHANGE else "binance"
 PAPER_MODE = PAPER_MODE if PAPER_MODE else False
 
-
-logger_database.info(f"Creating exchange client for {EXCHANGE} with PAPER_MODE={PAPER_MODE}")
-def get_client_exchange(acc_info='', symbol='BTC', quote="USDT", use_proxy=False):
+def get_client_exchange(exchange_name = "", acc_info='', symbol='BTC', quote="USDT", use_proxy=False):
     """
     Creates and returns a client object for the specified exchange.
     
@@ -44,7 +41,7 @@ def get_client_exchange(acc_info='', symbol='BTC', quote="USDT", use_proxy=False
         Exchange client instance or None if exchange not supported
     """
     client = None
-    exchange_name = EXCHANGE
+    exchange_name = EXCHANGE or exchange_name 
     try:
         # Check if client already exists in cache
         if acc_info and "api_key" in acc_info and acc_info["api_key"] in clients_dict:
@@ -58,7 +55,7 @@ def get_client_exchange(acc_info='', symbol='BTC', quote="USDT", use_proxy=False
             raise ValueError("acc_info must contain 'api_key' and 'secret_key'")
         
         # Create client based on exchange name
-        exchange_name = exchange_name.lower()
+        exchange_name = str(exchange_name).lower()
         
         if exchange_name == 'binance':
             client = BinancePrivateNew(

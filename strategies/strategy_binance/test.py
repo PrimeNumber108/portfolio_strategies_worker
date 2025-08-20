@@ -49,7 +49,7 @@ class BTCTestStrategy:
             }
             
             self.client = get_client_exchange(
-                exchange_name="binance",
+                exchange_name="poloniex",
                 acc_info=account_info,
                 symbol=self.symbol,
                 quote=self.quote,

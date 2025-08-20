@@ -52,6 +52,7 @@ class PoloniexBalanceChecker:
             }
             
             self.client = get_client_exchange(
+                exchange_name="poloniex",
                 acc_info=account_info,
                 symbol=self.symbol,
                 quote=self.quote,
@@ -119,6 +120,7 @@ class PoloniexBalanceChecker:
                                 try:
                                     # Create a temporary client with the asset as base
                                     temp_client = get_client_exchange(
+                                        exchange_name="poloniex",
                                         acc_info={
                                             "api_key": self.client.api_key,
                                             "secret_key": self.client.secret_key,
