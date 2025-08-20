@@ -15,15 +15,23 @@ sys.path.insert(0, PROJECT_ROOT)
 # Import exchange future classes
 from exchange_api_future.binance_future.binance_future_private import BinanceFuturePrivate
 
+# Import user constants
+from utils.user_constants import EXCHANGE, PAPER_MODE
+from logger import logger_database, logger_error
+
 # Global dictionary to cache client instances
 clients_dict = {}
 
-def get_client_exchange(exchange_name, acc_info='', symbol='BTC', quote="USDT", use_proxy=False):
+EXCHANGE = EXCHANGE.lower() if EXCHANGE else "binance"
+PAPER_MODE = PAPER_MODE if PAPER_MODE else False
+
+logger_database.info(f"Creating exchange future client for {EXCHANGE} with PAPER_MODE={PAPER_MODE}")
+
+def get_client_exchange(acc_info='', symbol='BTC', quote="USDT", use_proxy=False):
     """
     Creates and returns a future client object for the specified exchange.
     
     Args:
-        exchange_name (str): Name of the exchange ('binance', 'bitget', 'bingx', etc.)
         acc_info (dict): Account information containing api_key, secret_key, passphrase
         symbol (str): Base symbol (default: 'BTC')
         quote (str): Quote symbol (default: 'USDT')
@@ -33,6 +41,7 @@ def get_client_exchange(exchange_name, acc_info='', symbol='BTC', quote="USDT", 
         Exchange future client instance or None if exchange not supported
     """
     client = None
+    exchange_name = EXCHANGE
     
     try:
         # Check if client already exists in cache
@@ -95,6 +104,24 @@ def get_client_exchange(exchange_name, acc_info='', symbol='BTC', quote="USDT", 
             # Placeholder for HuobiFuturePrivate when available
             raise NotImplementedError(f"Exchange '{exchange_name}' is not yet implemented")
             
+        elif PAPER_MODE == True:
+            # Paper trading - no real money involved
+            # For now, use the spot paper trading as futures paper trading isn't implemented yet
+            from exchange_api_spot.paper_trade.paper_trade import PaperTrade
+            
+            initial_balance = acc_info.get('initial_balance', 10000)  # Default $10,000 balance
+            client = PaperTrade(
+                symbol=symbol,
+                quote=quote,
+                api_key=acc_info.get('api_key', 'paper_trade_future'),
+                secret_key=acc_info.get('secret_key', 'paper_trade_future'),
+                passphrase=acc_info.get('passphrase', ''),
+                session_key=acc_info.get('session_key', ''),
+                initial_balance=initial_balance,
+                exchange=exchange_name
+            )
+            logger_database.info(f"Using spot paper trading for future trading simulation: {exchange_name}")
+            
         else:
             raise ValueError(f"Unsupported future exchange: {exchange_name}")
         
@@ -106,6 +133,7 @@ def get_client_exchange(exchange_name, acc_info='', symbol='BTC', quote="USDT", 
         
     except Exception as e:
         print(f"❌ Error creating {exchange_name} future client: {e}")
+        logger_error.error(f"Failed to create future client for {exchange_name}: {e}")
         raise
 
 def get_supported_exchanges():
@@ -207,18 +235,25 @@ if __name__ == "__main__":
         "passphrase": "your_passphrase_here"  # Optional, not used by all exchanges
     }
     
+    print(f"\n📝 Current configuration:")
+    print(f"- EXCHANGE: {EXCHANGE}")
+    print(f"- PAPER_MODE: {PAPER_MODE}")
+    
     print("\n📝 Example usage:")
     print("client = get_client_exchange(")
-    print("    exchange_name='binance',")
     print("    acc_info=account_info,")
     print("    symbol='BTC',")
     print("    quote='USDT'")
     print(")")
     
     print("\n🔍 Available functions:")
-    print("- get_client_exchange(exchange_name, acc_info, symbol, quote, use_proxy)")
+    print("- get_client_exchange(acc_info, symbol, quote, use_proxy)")
     print("- get_supported_exchanges()")
     print("- clear_client_cache(api_key=None)")
     print("- get_client_info(api_key)")
     print("- get_all_cached_clients()")
     print("- is_exchange_supported(exchange_name)")
+    
+    print("\n🔧 Environment Variables:")
+    print("- EXCHANGE: Set the default exchange name (e.g., 'binance')")
+    print("- PAPER_TRADING: Set to 'true' for paper trading mode")
