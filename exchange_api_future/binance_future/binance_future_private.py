@@ -4,6 +4,7 @@ import json
 import redis
 from  binance.client import Client
 from utils import convert_order_status
+from logger import logger_error
 
 r = redis.Redis(host='localhost', port=6379, decode_responses=True)
 class BinanceFuturePrivate:
@@ -28,22 +29,45 @@ class BinanceFuturePrivate:
         else:
             self.price_scale, self.qty_scale = self.get_scale()
 
-    def get_scale(self):
+    def get_scale(self) -> tuple:
         """
-        Retrieves the price and quantity scales for the given symbol from the Binance Futures API.
-
-        Parameters:
-            None
-
+        Get price and quantity scales for the symbol.
+        
         Returns:
-            None
+            tuple: (price_scale, qty_scale)
         """
-        re = self.trade.get_symbol_info(symbol=self.symbol_ex)
-        scale_price_raw= re["filters"][0]["tickSize"]
-        scale_qty_raw = re["filters"][1]["stepSize"]
-        price_scale = int(-math.log10(float(scale_price_raw)))
-        qty_scale =  int(-math.log10(float(scale_qty_raw)))
-        return price_scale, qty_scale
+        try:
+            # Use futures_exchange_info() for Binance Futures
+            result = self.trade.futures_exchange_info()
+            
+            # Find the symbol in the symbols list
+            for symbol_info in result['symbols']:
+                if symbol_info['symbol'] == self.symbol_ex:
+                    
+                    for filter_item in symbol_info['filters']:
+                        if filter_item['filterType'] == 'PRICE_FILTER':
+                            tick_size = float(filter_item['tickSize'])
+                            if tick_size > 0:
+                                price_scale = int(-math.log10(tick_size))
+                            print(f'PRICE_FILTER: tickSize={tick_size}, price_scale={price_scale}')
+                        
+                        elif filter_item['filterType'] == 'LOT_SIZE':
+                            step_size = float(filter_item['stepSize'])
+                            if step_size > 0:
+                                qty_scale = int(-math.log10(step_size))
+                            print(f'LOT_SIZE: stepSize={step_size}, qty_scale={qty_scale}')
+                    
+                  
+                    print(f'Cached scales: price_scale={price_scale}, qty_scale={qty_scale}')
+                    
+                    return price_scale, qty_scale
+            
+            raise ValueError(f"Symbol {self.symbol_ex} not found in exchange info")
+            
+        except Exception as e:
+            logger_error.error("Error getting scale: %s", e)
+            print(f"Error getting scale: {e}")
+            return 2, 3  # Default values
 
     def delete_full_filled_order(self, order_id):
         """
