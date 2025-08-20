@@ -180,8 +180,7 @@ class BinanceFuturePrivate:
             params = {'symbol':symbol.upper(), 
                       'side': str(side_order).upper(), 
                       'type':"MARKET", 
-                      'quantity':str(quantity),
-                      'timeInForce':force_ }
+                      'quantity':str(quantity)}
             result = self.trade.futures_create_order(**params)
 
         if "orderId" in result:

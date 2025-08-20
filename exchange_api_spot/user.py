@@ -18,12 +18,18 @@ from exchange_api_spot.binance.binance_private import BinancePrivate
 from exchange_api_spot.poloniex.poloniex_private import PoloniexPrivate
 from exchange_api_spot.paper_trade.paper_trade import PaperTrade
 
-EXCHANGE = os.environ.get("EXCHANGE", "")
-PAPER_MODE = os.environ.get("PAPER_TRADING", "")
+# Import user constants
+from utils.user_constants import EXCHANGE, PAPER_MODE
+from logger import logger_database, logger_error
 
 clients_dict = {}
 
-def get_client_exchange(exchange_name, acc_info='', symbol='BTC', quote="USDT", use_proxy=False):
+EXCHANGE = EXCHANGE.lower() if EXCHANGE else "binance"
+PAPER_MODE = PAPER_MODE if PAPER_MODE else False
+
+
+logger_database.info(f"Creating exchange client for {EXCHANGE} with PAPER_MODE={PAPER_MODE}")
+def get_client_exchange(acc_info='', symbol='BTC', quote="USDT", use_proxy=False):
     """
     Creates and returns a client object for the specified exchange.
     

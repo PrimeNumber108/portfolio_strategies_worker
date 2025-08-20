@@ -14,7 +14,6 @@ import requests
 from decimal import Decimal
 from typing import Dict, Optional, Any, List
 import redis
-from exchange_api_spot.user import get_client_exchange
 
 # Add the parent directory to the path to import our modules
 CURRENT_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -187,6 +186,9 @@ class PaperTrade:
             
             # First try to get from actual exchange using get_client_exchange
             try:
+                # Lazy import to avoid circular dependency
+                from exchange_api_spot.user import get_client_exchange
+                
                 acc_info = {
                     'api_key': 'demo_key',
                     'secret_key': 'demo_secret',
@@ -261,6 +263,9 @@ class PaperTrade:
             
             # First try to get from actual exchange using get_client_exchange
             try:
+                # Lazy import to avoid circular dependency
+                from exchange_api_spot.user import get_client_exchange
+                
                 acc_info = {
                     'api_key': 'demo_key',
                     'secret_key': 'demo_secret',
@@ -348,6 +353,9 @@ class PaperTrade:
             
             # First try to get from actual exchange using get_client_exchange
             try:
+                # Lazy import to avoid circular dependency
+                from exchange_api_spot.user import get_client_exchange
+                
                 acc_info = {
                     'api_key': 'demo_key',
                     'secret_key': 'demo_secret',
@@ -428,6 +436,9 @@ class PaperTrade:
             
             # First try to get from actual exchange using get_client_exchange
             try:
+                # Lazy import to avoid circular dependency
+                from exchange_api_spot.user import get_client_exchange
+                
                 acc_info = {
                     'api_key': 'demo_key',
                     'secret_key': 'demo_secret',
@@ -934,7 +945,7 @@ def main():
     print("🔧 To use paper trading in strategies:")
     print("   - Set GOLANG_API_URL environment variable if API is not on localhost:8080")
     print("   - Set PAPER_TRADE_EXCHANGE to specify which exchange data to use for pricing")
-    print("   - Use exchange_name='paper_trade' in get_client_exchange()")
+    print("   - Use PAPER_MODE=True and appropriate EXCHANGE environment variable in get_client_exchange()")
 
 
 if __name__ == "__main__":

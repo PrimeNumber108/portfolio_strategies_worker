@@ -29,7 +29,7 @@ from utils import (
 
 
 class BTCTestStrategy:
-    def __init__(self, api_key="", secret_key="", passphrase="", session_id="", exchange=""):
+    def __init__(self, api_key="", secret_key="", passphrase=""):
         """
         Initialize the BTC test strategy
         
@@ -44,7 +44,6 @@ class BTCTestStrategy:
         self.price_threshold = 90000  # $90k USD (changed from 100k)
         self.buy_amount = 0.0001  # Amount of BTC to buy (adjust as needed)
         self.run_key = generate_random_string()
-        self.exchange = exchange
         
         # Initialize Poloniex client using get_client_exchange
         try:
@@ -52,11 +51,9 @@ class BTCTestStrategy:
                 "api_key": api_key,
                 "secret_key": secret_key,
                 "passphrase": passphrase,
-                "session_key": session_id  # Poloniex uses session_key
             }
             
             self.client = get_client_exchange(
-                exchange_name=self.exchange,
                 acc_info=account_info,
                 symbol=self.symbol,
                 quote=self.quote,
@@ -235,7 +232,6 @@ class BTCTestStrategy:
                 self.run_key,
                 self.symbol,
                 get_line_number(),
-                self.exchange,
                 "test-strategy.py",
                 f"Strategy error: {e}"
             )
@@ -252,15 +248,13 @@ def main():
     API_KEY = os.environ.get("STRATEGY_API_KEY", "")
     SECRET_KEY = os.environ.get("STRATEGY_API_SECRET", "")
     PASSPHRASE = os.environ.get("STRATEGY_PASSPHRASE", "")
-    SESSION_ID = os.environ.get("STRATEGY_SESSION_KEY", "")
-    EXCHANGE = os.environ.get("EXCHANGE", "")
+
 
     if not API_KEY or not SECRET_KEY:
         print("❌ Please set your Poloniex API credentials in environment variables:")
         print("   STRATEGY_API_KEY")
         print("   STRATEGY_API_SECRET") 
         print("   STRATEGY_PASSPHRASE (optional)")
-        print("   STRATEGY_SESSION_KEY (optional)")
         return
     
     print("✅ Environment variables loaded successfully")
@@ -272,8 +266,6 @@ def main():
             api_key=API_KEY,
             secret_key=SECRET_KEY,
             passphrase=PASSPHRASE,
-            session_id=SESSION_ID,
-            exchange=EXCHANGE,
         )
         
         print(f"🎯 Strategy initialized - Target price: ${strategy.price_threshold:,}")

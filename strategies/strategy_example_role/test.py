@@ -29,7 +29,7 @@ from utils import (
 
 
 class BTCTestStrategy:
-    def __init__(self, api_key="", secret_key="", passphrase="", session_id="", exchange=""):
+    def __init__(self, api_key="", secret_key="", passphrase=""):
         """
         Initialize the BTC test strategy
         
@@ -44,7 +44,6 @@ class BTCTestStrategy:
         self.price_threshold = 90000  # $90k USD (changed from 100k)
         self.buy_amount = 0.0001  # Amount of BTC to buy (adjust as needed)
         self.run_key = generate_random_string()
-        self.exchange = exchange
         
         # Initialize Poloniex client using get_client_exchange
         try:
@@ -52,11 +51,9 @@ class BTCTestStrategy:
                 "api_key": api_key,
                 "secret_key": secret_key,
                 "passphrase": passphrase,
-                "session_key": session_id  # Poloniex uses session_key
             }
             
             self.client = get_client_exchange(
-                exchange_name=self.exchange,
                 acc_info=account_info,
                 symbol=self.symbol,
                 quote=self.quote,
@@ -68,7 +65,10 @@ class BTCTestStrategy:
             print(f"❌ Failed to initialize Poloniex client: {e}")
             logger_error.error(f"Failed to initialize Poloniex client: {e}")
             raise
-
+    
+    def get_account_balance(self):
+        balance = self.client.get_account_balance()
+        return balance
     def get_current_price(self):
         """
         Get current BTC price from Poloniex
@@ -235,7 +235,6 @@ class BTCTestStrategy:
                 self.run_key,
                 self.symbol,
                 get_line_number(),
-                self.exchange,
                 "test-strategy.py",
                 f"Strategy error: {e}"
             )
@@ -249,11 +248,12 @@ def main():
     print("-" * 50)
     
     # Get configuration from environment variables
-    API_KEY = os.environ.get("STRATEGY_API_KEY", "")
-    SECRET_KEY = os.environ.get("STRATEGY_API_SECRET", "")
+    # API_KEY = os.environ.get("STRATEGY_API_KEY", "")
+    # SECRET_KEY = os.environ.get("STRATEGY_API_SECRET", "")
+    API_KEY = '42DFVKZ3-2JMTZF9F-C7CK4HLO-VWINY6J2'
+    SECRET_KEY = '618e840d8e92bf4fd8b0b15c3994ca23603535e1faf062813ca708c52d16ae663bfcc2f85961cd3cd620f0a2721cefdbd56674bf3beb669d073d458aab157ee1'
     PASSPHRASE = os.environ.get("STRATEGY_PASSPHRASE", "")
-    SESSION_ID = os.environ.get("STRATEGY_SESSION_KEY", "")
-    EXCHANGE = os.environ.get("EXCHANGE", "")
+
 
     if not API_KEY or not SECRET_KEY:
         print("❌ Please set your Poloniex API credentials in environment variables:")
@@ -272,8 +272,6 @@ def main():
             api_key=API_KEY,
             secret_key=SECRET_KEY,
             passphrase=PASSPHRASE,
-            session_id=SESSION_ID,
-            exchange=EXCHANGE,
         )
         
         print(f"🎯 Strategy initialized - Target price: ${strategy.price_threshold:,}")
