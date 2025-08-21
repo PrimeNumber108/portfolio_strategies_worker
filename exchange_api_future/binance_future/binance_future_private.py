@@ -37,7 +37,6 @@ class BinanceFuturePrivate:
             tuple: (price_scale, qty_scale)
         """
         try:
-            # Use futures_exchange_info() for Binance Futures
             result = self.trade.futures_exchange_info()
             
             # Find the symbol in the symbols list
@@ -210,6 +209,8 @@ class BinanceFuturePrivate:
         if "orderId" in result:
             return {"code": 0, "data": result}
         return False
+    
+    
     
     def cancel_order(self, order_id):
         """
@@ -574,6 +575,161 @@ class BinanceFuturePrivate:
 
         except Exception as e:
             return f"Error: {e}"
+
+    def close_position(self, symbol="", quote="USDT", percentage=100):
+        """
+        Close a position for a specific symbol.
+        
+        Args:
+            symbol (str): Base symbol (if empty, uses default symbol)
+            quote (str): Quote currency (default: 'USDT')  
+            percentage (int): Percentage of position to close (default: 100 for full close)
+            
+        Returns:
+            dict: Order result or error message
+        """
+        try:
+            if symbol != "":
+                full_symbol = f'{symbol}{quote}'
+            else:
+                full_symbol = self.symbol_ex
+                
+            # Get current position
+            position_info = self.get_position_info(symbol, quote)
+            
+            if not position_info or position_info.get('positionAmt', 0) == 0:
+                return {"code": -1, "msg": f"No open position found for {full_symbol}"}
+                
+            position_amt = float(position_info['positionAmt'])
+            
+            close_qty = abs(position_amt * (percentage / 100))
+            if close_qty == 0:
+                return {"code": -1, "msg": "No position to close"}
+            
+            # Determine side (opposite to current position)
+            if position_amt > 0:
+                # Long position - place SELL order to close
+                side = "SELL"
+            else:
+                # Short position - place BUY order to close
+                side = "BUY"
+            
+            close_qty = round(close_qty, self.qty_scale)
+            
+            print(f"Closing {percentage}% of {full_symbol} position: {side} {close_qty}")
+            
+            # Place market order to close position
+            params = {
+                'symbol': full_symbol.upper(),
+                'side': side,
+                'type': 'MARKET',
+                'quantity': str(close_qty),
+                'reduceOnly': True  # This ensures we only reduce the position
+            }
+            
+            result = self.trade.futures_create_order(**params)
+            
+            if "orderId" in result:
+                print(f"Position close order placed: {result['orderId']}")
+                return {"code": 0, "data": result, "msg": f"Position closed successfully"}
+            else:
+                return {"code": -1, "data": result, "msg": "Failed to place close order"}
+                
+        except Exception as e:
+            logger_error.error("Error closing position: %s", e)
+            print(f"Error closing position: {e}")
+            return {"code": -1, "msg": str(e)}
+    
+    def close_all_positions(self):
+        """
+        Close all open positions for all symbols.
+        
+        Returns:
+            dict: Results of closing all positions
+        """
+        try:
+            # Get all positions
+            positions = self.trade.futures_position_information()
+            
+            results = []
+            closed_count = 0
+            
+            for pos in positions:
+                position_amt = float(pos['positionAmt'])
+                
+                # Skip positions with zero amount
+                if position_amt == 0:
+                    continue
+                    
+                symbol = pos['symbol']
+                
+                # Determine side (opposite to current position)
+                if position_amt > 0:
+                    side = "SELL"
+                else:
+                    side = "BUY"
+                
+                close_qty = abs(position_amt)
+                
+                try:
+                    print(f"Closing position for {symbol}: {side} {close_qty}")
+                    
+                    # Place market order to close position
+                    params = {
+                        'symbol': symbol,
+                        'side': side,
+                        'type': 'MARKET',
+                        'quantity': str(close_qty),
+                        'reduceOnly': True
+                    }
+                    
+                    result = self.trade.futures_create_order(**params)
+                    
+                    if "orderId" in result:
+                        results.append({
+                            "symbol": symbol,
+                            "orderId": result['orderId'],
+                            "side": side,
+                            "quantity": str(close_qty),
+                            "status": "success"
+                        })
+                        closed_count += 1
+                        print(f"Closed position for {symbol}: Order {result['orderId']}")
+                    else:
+                        results.append({
+                            "symbol": symbol,
+                            "status": "failed",
+                            "error": "Failed to place order",
+                            "details": result
+                        })
+                        print(f"Failed to close position for {symbol}")
+                        
+                except Exception as e:
+                    results.append({
+                        "symbol": symbol,
+                        "status": "error",
+                        "error": str(e)
+                    })
+                    logger_error.error("Error closing position for %s: %s", symbol, e)
+                    print(f"Error closing position for {symbol}: {e}")
+            
+            return {
+                "code": 0,
+                "msg": f"Close all positions completed. {closed_count} positions closed.",
+                "closed_count": closed_count,
+                "total_positions": len([p for p in positions if float(p['positionAmt']) != 0]),
+                "results": results
+            }
+            
+        except Exception as e:
+            logger_error.error("Error closing all positions: %s", e)
+            print(f"Error closing all positions: {e}")
+            return {
+                "code": -1,
+                "msg": f"Error closing all positions: {str(e)}",
+                "closed_count": 0,
+                "results": []
+            }
 
     
         

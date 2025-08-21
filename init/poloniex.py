@@ -54,7 +54,7 @@ class PoloniexBalanceChecker:
                 acc_info=account_info,
                 symbol=self.symbol,
                 quote=self.quote,
-                use_proxy=False  # Disable proxy to avoid connection issues
+                use_proxy=False
             )
             print(f"Poloniex client initialized successfully for session: {session_id}")
             logger_database.info(f"Poloniex balance checker initialized for session: {session_id}")
@@ -121,7 +121,7 @@ class PoloniexBalanceChecker:
                                         acc_info={
                                             "api_key": self.client.api_key,
                                             "secret_key": self.client.secret_key,
-                                            "passphrase": self.client.passphrase,
+                                            "passphrase": getattr(self.client, 'passphrase', ''),
                                             "session_key": self.session_id
                                         },
                                         symbol=asset_symbol,

@@ -40,8 +40,9 @@ def get_client_exchange(exchange_name = "", acc_info='', symbol='BTC', quote="US
         Exchange future client instance or None if exchange not supported
     """
     client = None
-    exchange_name = EXCHANGE or exchange_name 
+    # exchange_name = EXCHANGE or exchange_name 
 
+ 
     try:
         # Check if client already exists in cache
         if acc_info and "api_key" in acc_info and acc_info["api_key"] in clients_dict:
