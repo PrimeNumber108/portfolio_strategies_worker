@@ -251,6 +251,7 @@ def main():
     # Get configuration from environment variables
     API_KEY = os.environ.get("STRATEGY_API_KEY", "")
     SECRET_KEY = os.environ.get("STRATEGY_API_SECRET", "")
+   
     PASSPHRASE = os.environ.get("STRATEGY_PASSPHRASE", "")
 
 
@@ -273,9 +274,10 @@ def main():
             passphrase=PASSPHRASE,
         )
         balance = strategy.get_account_balance()
-        print(f"💰 Account Balance: {balance}")
-        print(f"🎯 Strategy initialized - Target price: ${strategy.price_threshold:,}")
+        logger_error.error(f"💰 Account Balance: {balance}")
+        logger_error.error(f"🎯 Strategy initialized - Target price: ${strategy.price_threshold:,}")
         logger_database.info("BTC Test Strategy initialized successfully")
+        logger_error.error("BTC Test Strategy initialized successfully")
 
         # Strategy execution loop
         iteration = 0

@@ -20,11 +20,13 @@ from exchange_api_spot.paper_trade.paper_trade import PaperTrade
 
 # Import user constants
 from utils.user_constants import EXCHANGE, PAPER_MODE
-from logger import logger_database, logger_error
+from logger import logger_database, logger_error, logger_access
 
 clients_dict = {}
 
 PAPER_MODE = PAPER_MODE if PAPER_MODE else False
+
+logger_database.info("PAPER_MODE trading mode enabled: ",PAPER_MODE)
 
 def get_client_exchange(exchange_name = "", acc_info='', symbol='BTC', quote="USDT", use_proxy=False):
     """
@@ -56,77 +58,77 @@ def get_client_exchange(exchange_name = "", acc_info='', symbol='BTC', quote="US
         
         # Create client based on exchange name
         exchange_name = str(exchange_name).lower()
-        
-        if exchange_name == 'binance':
-            client = BinancePrivateNew(
-                symbol=symbol, 
-                quote=quote, 
-                api_key=acc_info['api_key'], 
-                secret_key=acc_info['secret_key'], 
-                passphrase=acc_info.get('passphrase', ''),
-                use_proxy=use_proxy
-            )
-            
-        elif exchange_name == 'binance_old':
-            client = BinancePrivate(
-                symbol=symbol, 
-                quote=quote, 
-                api_key=acc_info['api_key'], 
-                secret_key=acc_info['secret_key'], 
-                passphrase=acc_info.get('passphrase', '')
-            )
-            
-        elif exchange_name == 'poloniex':
-            client = PoloniexPrivate(
-                symbol=symbol, 
-                quote=quote, 
-                api_key=acc_info['api_key'], 
-                secret_key=acc_info['secret_key'], 
-                passphrase=acc_info.get('passphrase', ''),
-                session_key=acc_info.get('session_key', '')
-            )
-            
-        # Add more exchanges here as they become available
-        elif exchange_name == 'bitget':
-            # Placeholder for BitgetPrivate when available
-            raise NotImplementedError(f"Exchange '{exchange_name}' is not yet implemented")
-            
-        elif exchange_name == 'bingx':
-            # Placeholder for BingXPrivate when available
-            raise NotImplementedError(f"Exchange '{exchange_name}' is not yet implemented")
-            
-        elif exchange_name == 'gateio':
-            # Placeholder for GateioPrivate when available
-            raise NotImplementedError(f"Exchange '{exchange_name}' is not yet implemented")
-            
-        elif exchange_name == 'mexc':
-            # Placeholder for MexcPrivate when available
-            raise NotImplementedError(f"Exchange '{exchange_name}' is not yet implemented")
-            
-        elif exchange_name == 'okx':
-            # Placeholder for OkxPrivate when available
-            raise NotImplementedError(f"Exchange '{exchange_name}' is not yet implemented")
-            
-        elif exchange_name == 'bybit':
-            # Placeholder for BybitPrivate when available
-            raise NotImplementedError(f"Exchange '{exchange_name}' is not yet implemented")
-            
-        elif  PAPER_MODE == True:
-            # Paper trading - no real money involved
-            initial_balance = acc_info.get('initial_balance', 10000)  # Default $10,000 balance
-            client = PaperTrade(
-                symbol=symbol,
-                quote=quote,
-                api_key=acc_info.get('api_key', 'paper_trade'),
-                secret_key=acc_info.get('secret_key', 'paper_trade'),
-                passphrase=acc_info.get('passphrase', ''),
-                session_key=acc_info.get('session_key', ''),
-                initial_balance=initial_balance,
-                exchange=exchange_name
-            )
-            
+        if PAPER_MODE == 'true':
+             # Paper trading - no real money involved
+                initial_balance = acc_info.get('initial_balance', 10000)  # Default $10,000 balance
+                client = PaperTrade(
+                    symbol=symbol,
+                    quote=quote,
+                    api_key=acc_info.get('api_key', 'paper_trade'),
+                    secret_key=acc_info.get('secret_key', 'paper_trade'),
+                    passphrase=acc_info.get('passphrase', ''),
+                    session_key=acc_info.get('session_key', ''),
+                    initial_balance=initial_balance,
+                    exchange=exchange_name
+                )
         else:
-            raise ValueError(f"Unsupported exchange: {exchange_name}")
+            if exchange_name == 'binance':
+                client = BinancePrivateNew(
+                    symbol=symbol, 
+                    quote=quote, 
+                    api_key=acc_info['api_key'], 
+                    secret_key=acc_info['secret_key'], 
+                    passphrase=acc_info.get('passphrase', ''),
+                    use_proxy=use_proxy
+                )
+                
+            elif exchange_name == 'binance_old':
+                client = BinancePrivate(
+                    symbol=symbol, 
+                    quote=quote, 
+                    api_key=acc_info['api_key'], 
+                    secret_key=acc_info['secret_key'], 
+                    passphrase=acc_info.get('passphrase', '')
+                )
+                
+            elif exchange_name == 'poloniex':
+                client = PoloniexPrivate(
+                    symbol=symbol, 
+                    quote=quote, 
+                    api_key=acc_info['api_key'], 
+                    secret_key=acc_info['secret_key'], 
+                    passphrase=acc_info.get('passphrase', ''),
+                    session_key=acc_info.get('session_key', '')
+                )
+                
+            # Add more exchanges here as they become available
+            elif exchange_name == 'bitget':
+                # Placeholder for BitgetPrivate when available
+                raise NotImplementedError(f"Exchange '{exchange_name}' is not yet implemented")
+                
+            elif exchange_name == 'bingx':
+                # Placeholder for BingXPrivate when available
+                raise NotImplementedError(f"Exchange '{exchange_name}' is not yet implemented")
+                
+            elif exchange_name == 'gateio':
+                # Placeholder for GateioPrivate when available
+                raise NotImplementedError(f"Exchange '{exchange_name}' is not yet implemented")
+                
+            elif exchange_name == 'mexc':
+                # Placeholder for MexcPrivate when available
+                raise NotImplementedError(f"Exchange '{exchange_name}' is not yet implemented")
+                
+            elif exchange_name == 'okx':
+                # Placeholder for OkxPrivate when available
+                raise NotImplementedError(f"Exchange '{exchange_name}' is not yet implemented")
+                
+            elif exchange_name == 'bybit':
+                # Placeholder for BybitPrivate when available
+                raise NotImplementedError(f"Exchange '{exchange_name}' is not yet implemented")
+                
+               
+            else:
+                raise ValueError(f"Unsupported exchange: {exchange_name}")
         
         # Cache the client instance
         if client and acc_info.get("api_key"):

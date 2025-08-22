@@ -189,16 +189,40 @@ def execute_strategy_file(script_path, config):
         os.environ['STRATEGY_API_SECRET'] = config.get('api_secret', '')
         os.environ['STRATEGY_EXCHANGE'] = config.get('exchange', '')
         os.environ['STRATEGY_INITIAL_BALANCE'] = str(config.get('initial_balance', 0))
+        os.environ['STRATEGY_PASSPHRASE'] = config.get('passphrase', '')
         
+        # Set paper trading specific environment variables
+        if config.get('paper_trading', False):
+            os.environ['PAPER_TRADING'] = 'true'
+            os.environ['TRADING_MODE'] = 'paper'
+            logger_access.info("📝 Paper trading mode enabled")
+             
         # Execute the module
         spec.loader.exec_module(strategy_module)
         
         # Look for main function or strategy class
         if hasattr(strategy_module, 'main'):
             logger_access.info("📞 Calling main() function...")
-            result = strategy_module.main()
-            logger_access.info(f"✅ Strategy file execution completed with result: {result}")
-            return True
+            
+            # Check if this is paper trading mode
+            if config.get('paper_trading', False):
+                logger_access.info("📝 Running strategy in paper trading mode")
+            
+            # Check if this is continuous mode
+            if config.get('continuous_mode', False):
+                logger_access.info("🔄 Running strategy in continuous mode (may run indefinitely)")
+            
+            try:
+                result = strategy_module.main()
+                logger_access.info(f"✅ Strategy file execution completed with result: {result}")
+                return True
+            except KeyboardInterrupt:
+                logger_access.info("🛑 Strategy execution interrupted by user")
+                return True
+            except Exception as e:
+                logger_access.error(f"❌ Strategy main() function failed: {e}")
+                logger_access.error(f"📋 Traceback:\n{traceback.format_exc()}")
+                return False
         else:
             logger_access.info("⚠️  No main() function found, executing module directly...")
             logger_access.info("✅ Strategy module executed successfully")
@@ -308,6 +332,9 @@ def main():
     logger_access.info(f"📈 Asset Class: {config.get('asset_class', 'N/A')}")
     logger_access.info(f"⏰ Timeframe: {config.get('timeframe', 'N/A')}")
     logger_access.info(f"🕐 Start Time: {config.get('start_time', 'N/A')}")
+    logger_access.info(f"📝 Paper Trading: {config.get('paper_trading', False)}")
+    logger_access.info(f"🔄 Continuous Mode: {config.get('continuous_mode', False)}")
+    logger_access.info(f"🎯 Trading Mode: {config.get('trading_mode', 'N/A')}")
     
     # Find and execute strategy directory
     strategy_name = config.get('strategy_name', '')

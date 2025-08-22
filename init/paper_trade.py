@@ -1,67 +1,64 @@
 #!/usr/bin/env python3
 """
 Paper Trade Init Script
-- Uses demo credentials (api_key/secret = 'demo_key')
-- Initializes paper trading client with initial balance = 1000
-- Prints JSON result with Total = 1000 and simple balances
+- Initializes a paper portfolio with an initial balance = 1000 USDT
+- Emits RESULT: {json} in the same format the Go init parser expects
+
+Output format (aligned with poloniex init expectations):
+{
+  "success": true,
+  "exchange": "paper_trade",
+  "session_id": "...",
+  "timestamp": 1712345678,
+  "balances": {
+    "USDT": {"amount": 1000.0, "price": "1"},
+    "Total": 1000.0
+  },
+  "total_value_usd": 1000.0,
+  "message": "Initialized paper portfolio"
+}
 """
 import os
 import json
 import sys
+import time
 
 # Ensure import path
 CURRENT_DIR = os.path.dirname(os.path.abspath(__file__))
 PROJECT_ROOT = os.path.abspath(os.path.join(CURRENT_DIR, "../"))
 sys.path.insert(0, PROJECT_ROOT)
 
-from exchange_api_spot.user import get_client_exchange
+from logger import logger_error, logger_database
 
 
 def main():
     session_id = os.environ.get('STRATEGY_SESSION_KEY', 'paper_demo_session')
-    # Force paper trade exchange data source; still use our factory's paper path
-    os.environ['PAPER_TRADE_EXCHANGE'] = os.environ.get('PAPER_TRADE_EXCHANGE', 'binance')
 
-    # Demo credentials for paper
-    account_info = {
-        "api_key": "demo_key",
-        "secret_key": "demo_key",
-        "passphrase": "",
-        "session_key": session_id,
-        "initial_balance": 1000,
-    }
+    # Fixed paper initial balance
+    initial_balance = 1000.0
 
-    try:
-        client = get_client_exchange(
-            exchange_name="paper_trade",
-            acc_info=account_info,
-            symbol="BTC",
-            quote="USDT",
-            use_proxy=False,
-        )
-    except Exception as e:
-        # If factory doesn't accept exchange_name, rely on EXCHANGE env
-        os.environ['EXCHANGE'] = 'paper_trade'
-        client = get_client_exchange(
-            acc_info=account_info,
-            symbol="BTC",
-            quote="USDT",
-            use_proxy=False,
-        )
-
-    # Build a minimal consistent result (success with balances and Total)
+    # Build balances in the same structure used by real init scripts
     balances = {
-        "USDT": {"amount": 1000.0, "price": "1"},
-        "Total": 1000.0,
+        "USDT": {"amount": initial_balance, "price": "1"},
+        "Total": initial_balance,
     }
+
     result = {
         "success": True,
+        "exchange": "paper_trade",
+        "session_id": session_id,
+        "timestamp": int(time.time()),
         "balances": balances,
+        # Go init parser reads total_value_usd in the success branch
+        "total_value_usd": initial_balance,
+        "message": "Initialized paper portfolio",
     }
 
-    print("\n" + "=" * 50)
+    # Emit result for Go to parse
     print("RESULT:")
     print(json.dumps(result, indent=2))
+
+    logger_database.info("Paper init executed for session %s", session_id)
 
 
 if __name__ == "__main__":
