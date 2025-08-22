@@ -30,3 +30,9 @@ from .utils_exchange_info import (
                                     get_candle_data_info,
                                     convert_order_status)
 
+from .golang_auth import (
+                                    GolangAPIAuth,
+                                    get_golang_auth,
+                                    authenticate_golang_api,
+                                    make_golang_api_call)
+

@@ -137,7 +137,7 @@ def compute_balance(initial_balance: float, orders: List[Dict[str, Any]]) -> Dic
     total = cash + inventory_value
     balances["Cash"] = round(cash, 8)
     balances["Total"] = round(total, 8)
-
+    logger_database.info(f"compute_balance: {balances} ")
     return {
         "success": True,
         "balances": balances,
@@ -161,7 +161,6 @@ def main():
 
     try:
         payload = fetch_last_balance(base_url, session_key)
-        
         if not payload.get("success"):
             raise RuntimeError(payload)
         initial_balance = float(payload.get("initial_balance") or 0)

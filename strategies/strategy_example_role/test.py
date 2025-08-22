@@ -58,7 +58,7 @@ class BTCTestStrategy:
                 acc_info=account_info,
                 symbol=self.symbol,
                 quote=self.quote,
-                use_proxy=False  # Disable proxy to avoid connection issues
+                paper_mode=False  # Disable proxy to avoid connection issues
             )
             print(f"✅ Poloniex client initialized successfully for {self.symbol}/{self.quote}")
             logger_database.info(f"BTC test strategy initialized for {self.symbol}/{self.quote}")
@@ -70,6 +70,7 @@ class BTCTestStrategy:
     def get_account_balance(self):
         balance = self.client.get_account_balance()
         return balance
+    
     def get_current_price(self):
         """
         Get current BTC price from Poloniex
@@ -251,6 +252,7 @@ def main():
     # Get configuration from environment variables
     API_KEY = os.environ.get("STRATEGY_API_KEY", "")
     SECRET_KEY = os.environ.get("STRATEGY_API_SECRET", "")
+    
     PASSPHRASE = os.environ.get("STRATEGY_PASSPHRASE", "")
 
 
@@ -298,6 +300,7 @@ def main():
     except KeyboardInterrupt:
         print("\n🛑 Strategy stopped by user")
         logger_database.info("BTC Test Strategy stopped by user")
+
     except Exception as e:
         print(f"❌ Fatal error: {e}")
         logger_error.error(f"BTC Test Strategy fatal error: {e}")

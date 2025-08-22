@@ -26,16 +26,17 @@ from utils import (
     calculate_gap_hours,
     get_line_number,
     update_key_and_insert_error_log,
-    generate_random_string
+    generate_random_string,
+    make_golang_api_call
 )
 from logger import logger_database, logger_error
 
 # Redis configuration
 r = redis.Redis(host='localhost', port=6379, decode_responses=True)
 
-# Go API configuration
+# Go API configuration - Use execution service directly
 # GOLANG_API_BASE_URL = os.environ.get('GOLANG_API_URL', 'http://localhost:8080')
-GOLANG_API_BASE_URL = 'http://localhost:8080'
+GOLANG_API_BASE_URL = 'http://localhost:8083'  # Execution service port
 
 class PaperTrade:
     """
@@ -44,7 +45,7 @@ class PaperTrade:
     """
     
     def __init__(self, symbol='BTC', quote='USDT', api_key='', secret_key='', 
-                 passphrase='', session_key='', initial_balance=10000, exchange='binance'):
+                 passphrase='', session_key='', initial_balance=10000, exchange_name='binance', client_x = None):
         """
         Initialize paper trading client
         
@@ -64,12 +65,13 @@ class PaperTrade:
         self.symbol_redis = f'{symbol}_{quote}'.upper()
         self.api_key = api_key or 'paper_trade'
         self.secret_key = secret_key or 'paper_trade'
-        self.session_key = session_key or str(uuid.uuid4())
-        self.exchange = exchange
+        self.session_key = session_key if session_key else str(uuid.uuid4())
+        self.exchange = exchange_name
         self.r = r
+       
+        self.client = client_x
         
         # Get exchange from environment variable (default to binance if not set)
-        self.exchange = os.environ.get('PAPER_TRADE_EXCHANGE', 'binance').lower()
         self.initial_balance = initial_balance
         
         # Initialize scales
@@ -105,7 +107,11 @@ class PaperTrade:
         """Initialize account balances via Go API if they don't exist"""
         try:
             # Check if balances already exist by trying to get them
-            balance_response = self._api_call('GET', f'/api/v1/paper/balances?session_key={self.session_key}')
+            balance_response = make_golang_api_call(
+                method="GET",
+                endpoint=f"/api/v1/paper/balances?session_key={self.session_key}",
+                base_url=GOLANG_API_BASE_URL
+            )
             
             if balance_response and balance_response.get('success') and balance_response.get('data'):
                 print(f"✅ Paper balances already exist for session {self.session_key}")
@@ -119,7 +125,12 @@ class PaperTrade:
                 "initial_balance": self.initial_balance
             }
             
-            response = self._api_call('POST', '/api/v1/paper/balances', data=init_data)
+            response = make_golang_api_call(
+                method="POST",
+                endpoint="/api/v1/paper/balances",
+                data=init_data,
+                base_url=GOLANG_API_BASE_URL
+            )
             
             if response and response.get('success'):
                 print(f"✅ Initialized paper balance: {self.initial_balance} {self.quote}")
@@ -132,42 +143,7 @@ class PaperTrade:
             print(f"❌ Failed to initialize account balance: {e}")
             logger_error.error(f"Paper balance init error: {e}")
 
-    def _api_call(self, method: str, endpoint: str, data: dict = None) -> Dict:
-        """
-        Make API call to Go paper trade service
-        
-        Args:
-            method (str): HTTP method (GET, POST, etc.)
-            endpoint (str): API endpoint
-            data (dict): Request data for POST requests
-            
-        Returns:
-            dict: API response
-        """
-        try:
-            url = f"{GOLANG_API_BASE_URL}{endpoint}"
-            
-            if method.upper() == 'GET':
-                response = requests.get(url, timeout=10)
-            elif method.upper() == 'POST':
-                response = requests.post(url, json=data, timeout=10)
-            else:
-                raise ValueError(f"Unsupported HTTP method: {method}")
-            
-            if response.status_code == 200:
-                return response.json()
-            else:
-                print(f"⚠️ API call failed: {response.status_code} - {response.text}")
-                return {'success': False, 'error': f'HTTP {response.status_code}'}
-                
-        except requests.exceptions.RequestException as e:
-            print(f"❌ API request failed: {e}")
-            logger_error.error(f"Paper trade API call error: {e}")
-            return {'success': False, 'error': str(e)}
-        except Exception as e:
-            print(f"❌ API call error: {e}")
-            logger_error.error(f"Paper trade API call error: {e}")
-            return {'success': False, 'error': str(e)}
+
 
     def get_scale(self, base='', quote='') -> tuple:
         """
@@ -187,20 +163,7 @@ class PaperTrade:
             # First try to get from actual exchange using get_client_exchange
             try:
                 # Lazy import to avoid circular dependency
-                from exchange_api_spot.user import get_client_exchange
-                
-                acc_info = {
-                    'api_key': 'demo_key',
-                    'secret_key': 'demo_secret',
-                    'passphrase': ''
-                }
-                
-                exchange_client = get_client_exchange(
-                    exchange_name=self.exchange,
-                    acc_info=acc_info,
-                    symbol=base or self.base,
-                    quote=quote or self.quote
-                )
+                exchange_client = self.client
                 
                 if exchange_client and hasattr(exchange_client, 'get_scale'):
                     price_scale, qty_scale = exchange_client.get_scale(base, quote)
@@ -261,27 +224,13 @@ class PaperTrade:
             symbol = f'{base}_{quote}' if base else self.symbol_ex
             symbol_redis = symbol.upper()
             
-            # First try to get from actual exchange using get_client_exchange
             try:
                 # Lazy import to avoid circular dependency
-                from exchange_api_spot.user import get_client_exchange
-                
-                acc_info = {
-                    'api_key': 'demo_key',
-                    'secret_key': 'demo_secret',
-                    'passphrase': ''
-                }
-                
-                exchange_client = get_client_exchange(
-                    exchange_name=self.exchange,
-                    acc_info=acc_info,
-                    symbol=base or self.base,
-                    quote=quote or self.quote
-                )
+                exchange_client = self.client
                 
                 if exchange_client and hasattr(exchange_client, 'get_price'):
                     price_data = exchange_client.get_price(base, quote)
-                    
+                    print('price_data: ',price_data)
                     if price_data:
                         # Cache the result in Redis for future use
                         price_key = f'{symbol_redis}_{self.exchange}_price'
@@ -293,42 +242,7 @@ class PaperTrade:
             except Exception as e:
                 print(f"⚠️ Could not get price from {self.exchange} exchange: {e}")
             
-            # Fallback to Redis cache
-            price_keys = [
-                f'{symbol_redis}_{self.exchange}_price',
-                f'{symbol_redis}_{self.exchange}_ticker',
-                f'{symbol_redis}_{self.exchange}',
-            ]
-            
-            for price_key in price_keys:
-                price_data = self.r.get(price_key)
-                if price_data:
-                    try:
-                        data = json.loads(price_data)
-                        # Handle different data formats
-                        if isinstance(data, dict):
-                            if 'price' in data:
-                                print(f"💰 Got price from Redis cache: {data['price']}")
-                                return {'price': str(data['price']), 'ts': int(time.time() * 1000)}
-                            elif 'last' in data:
-                                print(f"💰 Got price from Redis cache: {data['last']}")
-                                return {'price': str(data['last']), 'ts': int(time.time() * 1000)}
-                            elif 'lastPr' in data:
-                                print(f"💰 Got price from Redis cache: {data['lastPr']}")
-                                return {'price': str(data['lastPr']), 'ts': int(time.time() * 1000)}
-                        elif isinstance(data, (int, float, str)):
-                            print(f"💰 Got price from Redis cache: {data}")
-                            return {'price': str(data), 'ts': int(time.time() * 1000)}
-                    except json.JSONDecodeError:
-                        # If it's a plain number string
-                        try:
-                            float(price_data)
-                            print(f"💰 Got price from Redis cache: {price_data}")
-                            return {'price': str(price_data), 'ts': int(time.time() * 1000)}
-                        except ValueError:
-                            continue
-            
-            print(f"⚠️ No price data found for {symbol_redis}_{self.exchange}")
+          
             return None
             
         except Exception as e:
@@ -354,20 +268,9 @@ class PaperTrade:
             # First try to get from actual exchange using get_client_exchange
             try:
                 # Lazy import to avoid circular dependency
-                from exchange_api_spot.user import get_client_exchange
-                
-                acc_info = {
-                    'api_key': 'demo_key',
-                    'secret_key': 'demo_secret',
-                    'passphrase': ''
-                }
-                
-                exchange_client = get_client_exchange(
-                    exchange_name=self.exchange,
-                    acc_info=acc_info,
-                    symbol=base or self.base,
-                    quote=quote or self.quote
-                )
+
+                exchange_client = self.client
+               
                 
                 if exchange_client and hasattr(exchange_client, 'get_ticker'):
                     ticker_data = exchange_client.get_ticker(base, quote)
@@ -434,23 +337,10 @@ class PaperTrade:
             symbol = f'{base}_{quote}' if base else self.symbol_ex
             symbol_redis = symbol.upper()
             
-            # First try to get from actual exchange using get_client_exchange
             try:
                 # Lazy import to avoid circular dependency
-                from exchange_api_spot.user import get_client_exchange
-                
-                acc_info = {
-                    'api_key': 'demo_key',
-                    'secret_key': 'demo_secret',
-                    'passphrase': ''
-                }
-                
-                exchange_client = get_client_exchange(
-                    exchange_name=self.exchange,
-                    acc_info=acc_info,
-                    symbol=base or self.base,
-                    quote=quote or self.quote
-                )
+                exchange_client = self.client
+
                 
                 if exchange_client and hasattr(exchange_client, 'get_candles'):
                     candle_data = exchange_client.get_candles(base, quote, interval, limit, start_time)
@@ -510,7 +400,11 @@ class PaperTrade:
             dict: Account balance data
         """
         try:
-            response = self._api_call('GET', f'/api/v1/paper/balances?session_key={self.session_key}')
+            response = make_golang_api_call(
+                method="GET",
+                endpoint=f"/api/v1/paper/balances?session_key={self.session_key}",
+                base_url=GOLANG_API_BASE_URL
+            )
             
             if response and response.get('success'):
                 return {'data': response.get('data', {})}
@@ -536,7 +430,11 @@ class PaperTrade:
             dict: Balance data for specific currency
         """
         try:
-            response = self._api_call('GET', f'/api/v1/paper/balances?session_key={self.session_key}')
+            response = make_golang_api_call(
+                method="GET",
+                endpoint=f"/api/v1/paper/balances?session_key={self.session_key}",
+                base_url=GOLANG_API_BASE_URL
+            )
             
             if response and response.get('success'):
                 balances = response.get('data', {})
@@ -615,7 +513,7 @@ class PaperTrade:
                 }
             
             current_price = float(current_price_data['price'])
-            
+            print('current_price:: ',current_price)
             # Determine execution price
             if order_type.upper() == 'MARKET':
                 execution_price = current_price
@@ -635,8 +533,13 @@ class PaperTrade:
             }
             
             # Make API call to place order
-            response = self._api_call('POST', '/api/v1/paper/orders', data=order_data)
-            
+            response = make_golang_api_call(
+                method="POST",
+                endpoint="/api/v1/execute/paper/orders",
+                data=order_data,
+                base_url=GOLANG_API_BASE_URL
+            )
+            logger_error.error(f"Paper trade place_order response: {response}")
             if response and response.get('success'):
                 order_result = response.get('data', {})
                 
@@ -702,7 +605,11 @@ class PaperTrade:
             # Use order_id or client_order_id
             target_id = order_id or client_order_id
             
-            response = self._api_call('GET', f'/api/v1/paper/orders/{target_id}?session_key={self.session_key}')
+            response = make_golang_api_call(
+                method="GET",
+                endpoint=f"/api/v1/paper/orders/{target_id}?session_key={self.session_key}",
+                base_url=GOLANG_API_BASE_URL
+            )
             
             if response and response.get('success'):
                 order_data = response.get('data', {})
@@ -749,7 +656,11 @@ class PaperTrade:
                 
             query_string = '&'.join(params)
             
-            response = self._api_call('GET', f'/api/v1/paper/orders?{query_string}')
+            response = make_golang_api_call(
+                method="GET",
+                endpoint=f"/api/v1/paper/orders?{query_string}",
+                base_url=GOLANG_API_BASE_URL
+            )
             
             if response and response.get('success'):
                 orders_data = response.get('data', [])
@@ -792,7 +703,11 @@ class PaperTrade:
         try:
             # In paper trading, orders are usually immediately filled,
             # but we'll implement cancellation for completeness
-            response = self._api_call('DELETE', f'/api/v1/paper/orders/{order_id}?session_key={self.session_key}')
+            response = make_golang_api_call(
+                method="DELETE",
+                endpoint=f"/api/v1/paper/orders/{order_id}?session_key={self.session_key}",
+                base_url=GOLANG_API_BASE_URL
+            )
             
             if response and response.get('success'):
                 print(f"✅ Paper trade order {order_id} canceled")
@@ -889,64 +804,64 @@ class PaperTrade:
             return {'data': []}
 
 
-def main():
-    """Test function for paper trading"""
-    print("🧪 Testing Paper Trade functionality...")
-    print("⚠️  Make sure the Go API server is running at http://localhost:8080")
-    print("-" * 60)
+# def main():
+#     """Test function for paper trading"""
+#     print("🧪 Testing Paper Trade functionality...")
+#     print("⚠️  Make sure the Go API server is running at http://localhost:8080")
+#     print("-" * 60)
     
-    # Set environment for testing
-    os.environ['PAPER_TRADE_EXCHANGE'] = 'binance'  # Use binance data for pricing
+#     # Set environment for testing
+#     # os.environ['PAPER_TRADE_EXCHANGE'] = 'binance'  # Use binance data for pricing
     
-    # Initialize paper trade
-    paper_trader = PaperTrade(
-        symbol='BTC',
-        quote='USDT',
-        session_key='test_session_123',
-        initial_balance=10000
-    )
+#     # Initialize paper trade
+#     paper_trader = PaperTrade(
+#         symbol='BTC',
+#         quote='USDT',
+#         session_key='test_session_123',
+#         initial_balance=10000
+#     )
     
-    # Test get price from Redis
-    print("\n1️⃣ Testing price retrieval from Redis...")
-    price = paper_trader.get_price()
-    print(f"📊 Current price: {price}")
+#     # Test get price from Redis
+#     print("\n1️⃣ Testing price retrieval from Redis...")
+#     price = paper_trader.get_price()
+#     print(f"📊 Current price: {price}")
     
-    # Test get balance via API
-    print("\n2️⃣ Testing balance retrieval via Go API...")
-    balance = paper_trader.get_account_balance()
-    print(f"💰 Account balance: {balance}")
+#     # Test get balance via API
+#     print("\n2️⃣ Testing balance retrieval via Go API...")
+#     balance = paper_trader.get_account_balance()
+#     print(f"💰 Account balance: {balance}")
     
-    # Test place order via API
-    if price and price.get('price'):
-        print(f"\n3️⃣ Testing order placement via Go API...")
-        order_result = paper_trader.place_order(
-            side_order='BUY',
-            quantity=0.001,
-            order_type='MARKET'
-        )
-        print(f"📝 Order result: {order_result}")
+#     # Test place order via API
+#     if price and price.get('price'):
+#         print(f"\n3️⃣ Testing order placement via Go API...")
+#         order_result = paper_trader.place_order(
+#             side_order='BUY',
+#             quantity=0.001,
+#             order_type='MARKET'
+#         )
+#         print(f"📝 Order result: {order_result}")
         
-        # Check balance after order
-        print(f"\n4️⃣ Testing balance after trade...")
-        balance_after = paper_trader.get_account_balance()
-        print(f"💰 Balance after trade: {balance_after}")
+#         # Check balance after order
+#         print(f"\n4️⃣ Testing balance after trade...")
+#         balance_after = paper_trader.get_account_balance()
+#         print(f"💰 Balance after trade: {balance_after}")
         
-        # Test order details
-        if order_result.get('code') == 0:
-            order_id = order_result['data']['orderId']
-            print(f"\n5️⃣ Testing order details retrieval...")
-            order_details = paper_trader.get_order_details(order_id)
-            print(f"📋 Order details: {order_details}")
-    else:
-        print("⚠️  Cannot place order - no price data available")
-        print("💡 Make sure Redis has price data for BTC_USDT_binance_price")
+#         # Test order details
+#         if order_result.get('code') == 0:
+#             order_id = order_result['data']['orderId']
+#             print(f"\n5️⃣ Testing order details retrieval...")
+#             order_details = paper_trader.get_order_details(order_id)
+#             print(f"📋 Order details: {order_details}")
+#     else:
+#         print("⚠️  Cannot place order - no price data available")
+#         print("💡 Make sure Redis has price data for BTC_USDT_binance_price")
 
-    print("\n✅ Paper trading test completed!")
-    print("🔧 To use paper trading in strategies:")
-    print("   - Set GOLANG_API_URL environment variable if API is not on localhost:8080")
-    print("   - Set PAPER_TRADE_EXCHANGE to specify which exchange data to use for pricing")
-    print("   - Use PAPER_MODE=True and appropriate EXCHANGE environment variable in get_client_exchange()")
+#     print("\n✅ Paper trading test completed!")
+#     print("🔧 To use paper trading in strategies:")
+#     print("   - Set GOLANG_API_URL environment variable if API is not on localhost:8080")
+#     print("   - Set PAPER_TRADE_EXCHANGE to specify which exchange data to use for pricing")
+#     print("   - Use PAPER_MODE=True and appropriate EXCHANGE environment variable in get_client_exchange()")
 
 
-if __name__ == "__main__":
-    main()
+# if __name__ == "__main__":
+#     main()

@@ -29,7 +29,7 @@ from utils import (
 
 
 class BTCTestStrategy:
-    def __init__(self, api_key="", secret_key="", passphrase=""):
+    def __init__(self, api_key="", secret_key="", passphrase="", session_key=""):
         """
         Initialize the BTC test strategy
         
@@ -37,13 +37,14 @@ class BTCTestStrategy:
             api_key (str): Poloniex API key
             secret_key (str): Poloniex secret key
             passphrase (str): Poloniex passphrase
-            session_id (str): Session ID for tracking (optional)
+            session_key (str): Session key for tracking
         """
         self.symbol = "BTC"
         self.quote = "USDT"
         self.price_threshold = 90000  # $90k USD (changed from 100k)
         self.buy_amount = 0.0001  # Amount of BTC to buy (adjust as needed)
         self.run_key = generate_random_string()
+        self.session_key = session_key
         
         # Initialize Poloniex client using get_client_exchange
         try:
@@ -58,7 +59,8 @@ class BTCTestStrategy:
                 acc_info=account_info,
                 symbol=self.symbol,
                 quote=self.quote,
-                use_proxy=False  # Disable proxy to avoid connection issues
+                session_key=session_key,  # Pass session_key to get_client_exchange
+                paper_mode=False  # Disable proxy to avoid connection issues
             )
             print(f"✅ Poloniex client initialized successfully for {self.symbol}/{self.quote}")
             logger_database.info(f"BTC test strategy initialized for {self.symbol}/{self.quote}")
@@ -79,6 +81,7 @@ class BTCTestStrategy:
         """
         try:
             price_data = self.client.get_price()
+            print('price_data')
             if price_data and 'price' in price_data:
                 current_price = float(price_data['price'])
                 print(f"📊 Current BTC price: ${current_price:,.2f} USDT")
@@ -153,9 +156,9 @@ class BTCTestStrategy:
             balance = self.check_account_balance()
             required_amount = self.buy_amount * current_price
             
-            if balance < required_amount:
-                print(f"❌ Insufficient balance. Required: ${required_amount:.2f}, Available: ${balance:.2f}")
-                return False
+            # if balance < required_amount:
+            #     print(f"❌ Insufficient balance. Required: ${required_amount:.2f}, Available: ${balance:.2f}")
+            #     return False
             
             # Place market buy order
             print(f"🛒 Placing buy order for {self.buy_amount} BTC at market price...")
@@ -212,23 +215,26 @@ class BTCTestStrategy:
                 return False
             
             # Check if price is below threshold
-            if current_price < self.price_threshold:
-                print(f"🎉 Price is below threshold!")
-                print(f"💡 Current: ${current_price:,.2f} < Target: ${self.price_threshold:,}")
+            # if current_price < self.price_threshold:
+            #     print(f"🎉 Price is below threshold!")
+            #     print(f"💡 Current: ${current_price:,.2f} < Target: ${self.price_threshold:,}")
                 
-                # Place buy order
-                success = self.place_buy_order(current_price)
-                if success:
-                    print("✅ Strategy executed successfully!")
-                    return True
-                else:
-                    print("❌ Failed to execute buy order")
-                    return False
-            else:
-                print(f"⏳ Price is above threshold")
-                print(f"💡 Current: ${current_price:,.2f} >= Target: ${self.price_threshold:,}")
-                print("🔄 Waiting for better price...")
+                
+            # else:
+            #     print(f"⏳ Price is above threshold")
+            #     print(f"💡 Current: ${current_price:,.2f} >= Target: ${self.price_threshold:,}")
+            #     print("🔄 Waiting for better price...")
+            #     return True
+
+            # Place buy order
+            success = self.place_buy_order(current_price)
+            logger_database.info(f"Buy order placed successfully {success}")
+            if success:
+                print("✅ Strategy executed successfully!")
                 return True
+            else:
+                print("❌ Failed to execute buy order")
+                return False
                 
         except Exception as e:
             print(f"❌ Strategy error: {e}")
@@ -249,21 +255,25 @@ def main():
     print("-" * 50)
     
     # Get configuration from environment variables
-    API_KEY = os.environ.get("STRATEGY_API_KEY", "")
-    SECRET_KEY = os.environ.get("STRATEGY_API_SECRET", "")
-   
-    PASSPHRASE = os.environ.get("STRATEGY_PASSPHRASE", "")
-
+    API_KEY = os.environ.get("STRATEGY_API_KEY", "asdqwqw")
+    SECRET_KEY = os.environ.get("STRATEGY_API_SECRET", "qwdwqwdqw")
+    PASSPHRASE = os.environ.get("STRATEGY_PASSPHRASE", "qwaaaa")
+    SESSION_KEY = os.environ.get("STRATEGY_SESSION_KEY", "sssaaa")
 
     if not API_KEY or not SECRET_KEY:
         print("❌ Please set your Poloniex API credentials in environment variables:")
         print("   STRATEGY_API_KEY")
         print("   STRATEGY_API_SECRET") 
         print("   STRATEGY_PASSPHRASE (optional)")
-        print("   STRATEGY_SESSION_KEY (optional)")
+        print("   STRATEGY_SESSION_KEY (required)")
+        return
+    
+    if not SESSION_KEY:
+        print("❌ Please set STRATEGY_SESSION_KEY environment variable")
         return
     
     print("✅ Environment variables loaded successfully")
+    print(f"🔑 Session Key: {SESSION_KEY}")
     logger_database.info("BTC Test Strategy starting...")
 
     try:
@@ -272,6 +282,7 @@ def main():
             api_key=API_KEY,
             secret_key=SECRET_KEY,
             passphrase=PASSPHRASE,
+            session_key=SESSION_KEY,
         )
         balance = strategy.get_account_balance()
         logger_error.error(f"💰 Account Balance: {balance}")

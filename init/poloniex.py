@@ -54,7 +54,6 @@ class PoloniexBalanceChecker:
                 acc_info=account_info,
                 symbol=self.symbol,
                 quote=self.quote,
-                use_proxy=False
             )
             print(f"Poloniex client initialized successfully for session: {session_id}")
             logger_database.info(f"Poloniex balance checker initialized for session: {session_id}")
