@@ -8,7 +8,7 @@ import requests
 import json
 from typing import Optional, Dict, Any
 from dotenv import load_dotenv
-
+from logger import logger_error, logger_database, logger_access
 # Load environment variables
 load_dotenv()
 
@@ -40,8 +40,8 @@ class GolangAPIAuth:
                 "password": self.password
             }
             
-            print(f"🔐 Authenticating with: {self.base_url}/api/v1/auth/login")
-            print(f"🔐 Auth data: {auth_data}")
+            logger_access.info(f"🔐 Authenticating with: {self.base_url}/api/v1/auth/login")
+            logger_access.info(f"🔐 Auth data: {auth_data}")
             
             response = requests.post(
                 f"{self.base_url}/api/v1/auth/login",
@@ -50,26 +50,26 @@ class GolangAPIAuth:
                 timeout=10
             )
             
-            print(f"🔐 Response Status: {response.status_code}")
-            print(f"🔐 Response Headers: {dict(response.headers)}")
-            print(f"🔐 Response Text: {response.text}")
+            logger_access.info(f"🔐 Response Status: {response.status_code}")
+            logger_access.info(f"🔐 Response Headers: {dict(response.headers)}")
+            logger_access.info(f"🔐 Response Text: {response.text}")
             
             if response.status_code == 200:
                 try:
                     auth_response = response.json()
                     self.token = auth_response.get("access_token")
-                    print(f"✅ Successfully authenticated with Golang API")
-                    print(f"✅ Token: {self.token[:20] if self.token else 'None'}...")
+                    logger_access.info(f"✅ Successfully authenticated with Golang API")
+                    logger_access.info(f"✅ Token: {self.token[:20] if self.token else 'None'}...")
                     return True
                 except json.JSONDecodeError as e:
-                    print(f"❌ JSON decode error: {e}")
+                    logger_access.info(f"❌ JSON decode error: {e}")
                     return False
             else:
-                print(f"❌ Authentication failed: {response.status_code} - {response.text}")
+                logger_access.info(f"❌ Authentication failed: {response.status_code} - {response.text}")
                 return False
                 
         except Exception as e:
-            print(f"❌ Error authenticating with Golang API: {str(e)}")
+            logger_error.error(f"❌ Error authenticating with Golang API: {str(e)}")
             return False
     
     def get_auth_headers(self) -> Dict[str, str]:
@@ -104,9 +104,9 @@ class GolangAPIAuth:
             headers = self.get_auth_headers()
             url = f"{self.base_url}{endpoint}"
             
-            print(f"🌐 Making {method} request to: {url}")
+            logger_access.info(f"🌐 Making {method} request to: {url}")
             if data:
-                print(f"📤 Request data: {data}")
+                logger_access.info(f"📤 Request data: {data}")
             
             if method.upper() == 'GET':
                 response = requests.get(url, headers=headers, timeout=10)
@@ -119,21 +119,21 @@ class GolangAPIAuth:
             else:
                 raise ValueError(f"Unsupported HTTP method: {method}")
             
-            print(f"📥 Response Status: {response.status_code}")
-            print(f"📥 Response Text: {response.text}")
+            logger_access.info(f"📥 Response Status: {response.status_code}")
+            logger_access.info(f"📥 Response Text: {response.text}")
             
             if response.status_code in [200, 201]:
                 try:
                     return response.json()
                 except json.JSONDecodeError:
-                    print("⚠️ Response is not valid JSON")
+                    logger_access.info("⚠️ Response is not valid JSON")
                     return {"success": True, "message": "Request successful"}
             else:
-                print(f"❌ Request failed: {response.status_code} - {response.text}")
+                logger_access.info(f"❌ Request failed: {response.status_code} - {response.text}")
                 return None
                 
         except Exception as e:
-            print(f"❌ Error making authenticated request: {str(e)}")
+            logger_error.error(f"❌ Error making authenticated request: {str(e)}")
             return None
 
 

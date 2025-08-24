@@ -30,7 +30,6 @@ def convert_to_datetime_index(date_str):
     """
     dt = pd.to_datetime(date_str, format='%d/%m/%Y %H:%M')
     df = pd.DataFrame(index=[dt])
-    print(df)
     return df.index
 
 

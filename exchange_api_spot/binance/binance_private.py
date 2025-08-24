@@ -11,6 +11,8 @@ current_dir = os.path.dirname(os.path.abspath(__file__))
 project_root = os.path.abspath(os.path.join(current_dir, "../../"))
 result_dir = os.path.join(project_root, "result")
 
+
+from logger import logger_access, logger_error
 # Create a new sys.path that prioritizes site-packages over local directories
 new_path = []
 # Add all paths that don't start with our project root first
@@ -95,7 +97,7 @@ class BinancePrivate:
         """
         if order_id in self.order_dict:
             self.order_dict.pop(order_id)
-        # logger_temp.info(f'order_id {order_id}') #print(self.order_dict)
+        # logger_temp.info(f'order_id {order_id}') 
 
     def get_ticker(self, base = "", quote ="USDT"):
         """
@@ -155,7 +157,6 @@ class BinancePrivate:
         data ={}
         for asset in result["balances"]:
             if asset["asset"] == coin.upper():
-                # print('asset',asset["asset"])
                 data = {
                     "asset": asset["asset"],
                     "free": float(asset["free"]),
@@ -323,7 +324,7 @@ class BinancePrivate:
             # Return the details dictionary
             return details
         except Exception as e:
-            print(e)
+            logger_error.error(e)
             return {"data": None}
         
     def get_volume_by_interval(self, symbol_input, quote_input, interval, start_time):

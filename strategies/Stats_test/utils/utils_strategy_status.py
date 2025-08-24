@@ -2,7 +2,7 @@ import json
 import random
 import requests
 import redis
-from logger import logger_error
+from logger import logger_error, logger_access
 from config import RUNNING_STRATEGY_STATUS_PATH, TELEGRAM_TOKEN, TELEGRAM_ERROR_CHANNEL
 r9 = redis.Redis(host='localhost', port=6379, decode_responses=True, db = 9)
 
@@ -40,7 +40,7 @@ def delete_strategy_key(json_file_path,stratgey_key):
         json_file.pop(stratgey_key)
     with open(json_file_path, 'w', encoding='utf-8') as file:
         json.dump(json_file, file, indent=2)
-        print(json_file)
+        logger_access.info(json_file)
 
 
 def get_kill_switch(symbol): # strategy ->
@@ -56,13 +56,13 @@ def get_kill_switch(symbol): # strategy ->
     """
     try:
         if r9.exists(str(symbol).upper()) < 1:      
-            print(f"{symbol} not exist generating new key")
+            logger_access.info(f"{symbol} not exist generating new key")
             #logger
             set_kill_switch(symbol=symbol, switch_bool=0)
         flag = json.loads(r9.get(str(symbol).upper())) 
         return flag
     except Exception as e:
-        print(e, e.__traceback__.tb_lineno)
+        logger_error.error(e, e.__traceback__.tb_lineno)
         logger_error.error(f"{e} {e.__traceback__.tb_lineno}") 
         return 1 # -> stop
 
@@ -84,7 +84,7 @@ def set_kill_switch(symbol, switch_bool): # main ->
         return True # -> still running
     except Exception as e:
         #logge_error
-        print(e, e.__traceback__.tb_lineno)
+        logger_error.error(e, e.__traceback__.tb_lineno)
         logger_error.error(f"{e} {e.__traceback__.tb_lineno}") 
         return False  # -> stop
 
@@ -92,7 +92,7 @@ def check_kill_switch(inventory_value, stop_loss, symbol, exchange):
     """
     Check if the inventory value is below the stop loss threshold. If it is, trigger the kill switch,
     send a message to the Telegram channel, and set the kill switch flag to 1. If the inventory value is
-    above the stop loss threshold, print a message indicating that the inventory is still normal.
+    above the stop loss threshold, logger_access.info a message indicating that the inventory is still normal.
     
     Parameters:
         inventory_value (float): The current value of the inventory.
@@ -108,14 +108,14 @@ def check_kill_switch(inventory_value, stop_loss, symbol, exchange):
     """
     try:
         if float(inventory_value) <= stop_loss:
-            print(f"Trigger kill switch in {exchange.upper()} because {inventory_value} <= {stop_loss}")
+            logger_access.info(f"Trigger kill switch in {exchange.upper()} because {inventory_value} <= {stop_loss}")
             send_to_telegram(f"Trigger kill switch in BINANCE because {inventory_value} <= {stop_loss}", TELEGRAM_ERROR_CHANNEL)
             set_kill_switch(symbol=symbol, switch_bool=1) 
             logger_error.error(f"Trigger kill switch in {exchange.upper()} because {inventory_value} <= {stop_loss}")
         else:
-            print(f"Still normal inventory: {inventory_value} - stop loss: {stop_loss}")
+            logger_access.info(f"Still normal inventory: {inventory_value} - stop loss: {stop_loss}")
     except Exception as e:
-        print(e, e.__traceback__.tb_lineno)
+        logger_error.error(e, e.__traceback__.tb_lineno)
         logger_error.error(f"{e} {e.__traceback__.tb_lineno}") 
 
 
@@ -173,6 +173,6 @@ def calculate_param_wash(volume_need_next_hour, round_min=5, round_max=40, frequ
         frequency_trade = random.uniform(frequency_min, frequency_max)
         capital_trade = random.uniform(capital_min, capital_max)
         if capital_trade * round_trade * (3600/frequency_trade) >= volume_need_next_hour:
-            print(round_trade, frequency_trade, capital_trade)
+            logger_access.info(round_trade, frequency_trade, capital_trade)
             break
     return int(round_trade), int(frequency_trade), int(capital_trade)

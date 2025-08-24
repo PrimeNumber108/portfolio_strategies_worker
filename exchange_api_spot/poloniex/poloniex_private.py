@@ -6,7 +6,7 @@ import redis
 from .authentication import Request
 from decimal import Decimal
 import uuid
-
+from logger import logger_access, logger_error, logger_database
 
 base_url = "https://api.poloniex.com"
 r = redis.Redis(host='localhost', port=6379, decode_responses=True)
@@ -221,7 +221,7 @@ class PoloniexPrivate:
                 golang_order_data["exchange_order_id"] = exchange_order_id
             
             # Use the new authentication utility to make the API call
-            print(f"📝 Creating order in Golang API: {golang_order_data}")
+            logger_access.info(f"📝 Creating order in Golang API: {golang_order_data}")
             response = make_golang_api_call(
                 method="POST",
                 endpoint="/api/v1/orders/orders",
@@ -231,7 +231,7 @@ class PoloniexPrivate:
             
             if response and response.get("success"):
                 order_id = response.get("order", {}).get("order_id")
-                print(f"✅ Order stored in Golang API with ID: {order_id}")
+                logger_access.info(f"✅ Order stored in Golang API with ID: {order_id}")
                 
                 # If we have exchange order ID, update the order
                 if exchange_order_id:
@@ -240,11 +240,11 @@ class PoloniexPrivate:
                 return True
             else:
                 error_msg = response.get("error", "Unknown error") if response else "No response"
-                print(f"❌ Failed to store order in Golang API: {error_msg}")
+                logger_access.info(f"❌ Failed to store order in Golang API: {error_msg}")
                 return False
                 
         except Exception as e:
-            print(f"❌ Error storing order in Golang API: {str(e)}")
+            logger_error.error(f"❌ Error storing order in Golang API: {str(e)}")
             return False
     
     def update_order_in_golang_api(self, order_id, exchange_order_id=None, status="pending", filled_qty=0, avg_price=0):
@@ -253,7 +253,7 @@ class PoloniexPrivate:
             # Validate status
             valid_statuses = ["pending", "filled", "canceled", "rejected", "partially_filled"]
             if status not in valid_statuses:
-                print(f"❌ Invalid status '{status}'. Must be one of: {valid_statuses}")
+                logger_access.info(f"❌ Invalid status '{status}'. Must be one of: {valid_statuses}")
                 return False
             
             update_data = {
@@ -268,7 +268,7 @@ class PoloniexPrivate:
                 update_data["avg_price"] = avg_price
             
             # Use the new authentication utility to make the API call
-            print(f"🔄 Updating order {order_id} with data: {update_data}")
+            logger_access.info(f"🔄 Updating order {order_id} with data: {update_data}")
             response = make_golang_api_call(
                 method="PUT",
                 endpoint=f"/api/v1/orders/{order_id}/status",
@@ -277,15 +277,15 @@ class PoloniexPrivate:
             )
             
             if response and response.get("success"):
-                print(f"✅ Order {order_id} updated in Golang API")
+                logger_access.info(f"✅ Order {order_id} updated in Golang API")
                 return True
             else:
                 error_msg = response.get("error", "Unknown error") if response else "No response"
-                print(f"❌ Failed to update order in Golang API: {error_msg}")
+                logger_access.info(f"❌ Failed to update order in Golang API: {error_msg}")
                 return False
                 
         except Exception as e:
-            print(f"❌ Error updating order in Golang API: {str(e)}")
+            logger_error.error(f"❌ Error updating order in Golang API: {str(e)}")
             return False
     
     def place_order(self, side_order, quantity, order_type, price='', force='normal'): 
@@ -323,14 +323,14 @@ class PoloniexPrivate:
 
         
         result = self._request('POST', '/orders', True, body=body)
-        print('result test: ',result)
+        logger_access.info('result test: ',result)
         
         if result and isinstance(result, dict) and "id" in result:
-            print('run 1')
+            logger_access.info('run 1')
             result['orderId'] = result['id']
             
             # ✅ NEW: Store order in Golang API
-            print("📝 Storing order in Golang API...")
+            logger_access.info("📝 Storing order in Golang API...")
             try:
                 # Prepare order data for Golang API
                 order_data_for_golang = {
@@ -341,7 +341,7 @@ class PoloniexPrivate:
                     "price": params_map.get("price", 0),
                     "timeInForce": force
                 }
-                print('result: ', result)
+                logger_access.info('result: ', result)
                 # Store order in Golang API
                 self.store_order_in_golang_api(
                     order_data_for_golang,
@@ -350,10 +350,10 @@ class PoloniexPrivate:
                 )
                 
 
-                print(f"✅ Order {result['id']} stored in both Poloniex and Golang API")
+                logger_access.info(f"✅ Order {result['id']} stored in both Poloniex and Golang API")
                 
             except Exception as e:
-                print(f"⚠️ Warning: Failed to store order in Golang API: {str(e)}")
+                logger_error.error(f"⚠️ Warning: Failed to store order in Golang API: {str(e)}")
                 # Don't fail the entire operation if Golang API storage fails
                 
             return {"data": result, "code": 0}

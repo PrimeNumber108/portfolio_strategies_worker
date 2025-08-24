@@ -5,7 +5,7 @@ import json
 import math
 import redis
 from binance.spot import Spot
-from logger import logger_error
+from logger import logger_error, logger_access
 from utils import calculate_gap_hours, get_candle_data_info,convert_order_status
 # from  binance.client import Client
 sys.path.append(os.getcwd())
@@ -317,7 +317,7 @@ class BinancePrivateNew:
             return details
         except Exception as e:
             logger_error.error(f"{e} {e.__traceback__.tb_lineno}")
-            print(f"{e} {e.__traceback__.tb_lineno}")
+            logger_error.error(f"{e} {e.__traceback__.tb_lineno}")
             return {'data':None}
 
     def get_open_orders(self):
@@ -415,14 +415,12 @@ class BinancePrivateNew:
         redis_klines = get_candle_data_info(symbol_redis=f"{symbol_input}_{quote_input}", exchange_name="binance", interval=interval, r=r)
         if redis_klines is not None:
             
-            # print("redis kline:", redis_klines['candle'][-tick_number:])
             return {'data': redis_klines['candle'][-tick_number:]}
         # klines = self.client.klines(symbol = f"{symbol_input}{quote_input}",interval = interval, startTime = start_time)
         result = self.get_candles(base = symbol_input,
                             quote = quote_input,
                             interval = interval,
                             start_time = start_time,)
-        # print("platform kline:", klines)
         return {'data':result['candle']}
 
     def get_fee_order(self, symbol ="", quote="USDT", 

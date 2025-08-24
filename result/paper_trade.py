@@ -18,7 +18,6 @@ import json
 import sys
 import time
 from typing import Dict, Any, List, Tuple
-from logger import logger_error, logger_database
 
 try:
     import requests
@@ -29,6 +28,8 @@ except Exception:
 CURRENT_DIR = os.path.dirname(os.path.abspath(__file__))
 PROJECT_ROOT = os.path.abspath(os.path.join(CURRENT_DIR, "../"))
 sys.path.insert(0, PROJECT_ROOT)
+from logger import logger_error, logger_database
+from utils import make_golang_api_call
 
 
 def env(name: str, default: str = "") -> str:
@@ -37,11 +38,12 @@ def env(name: str, default: str = "") -> str:
 
 
 def get_base_url() -> str:
-    return env("MGNT_API_BASE_URL", "http://localhost:8083")
+    # Prefer GOLANG_MGMT_API_URL (used by golang_auth), fallback to legacy MGNT_API_BASE_URL
+    return env("GOLANG_MGMT_API_URL", env("MGNT_API_BASE_URL", "http://localhost:8083"))
 
 
 def get_session_key() -> str:
-    return env("STRATEGY_SESSION_KEY", "")
+    return env("STRATEGY_SESSION_KEY", "demo_sessionkey")
 
 
 def get_auth_header() -> Dict[str, str]:
@@ -51,25 +53,26 @@ def get_auth_header() -> Dict[str, str]:
 
 def fetch_last_balance(base_url: str, session_key: str) -> Dict[str, Any]:
     """
-    Fetches orders for paper session and returns them with initial balance.
-    Calls the new paper-orders endpoint.
+    Fetch last paper orders via authenticated call using make_golang_api_call.
+    Uses .env credentials (GOLANG_API_USERNAME/PASSWORD) handled by golang_auth.
     """
-    url = f"{base_url}/api/v1/execute/paper-orders"
-    params = {"session_key": session_key}
-    headers = {"Content-Type": "application/json"}
-    headers.update(get_auth_header())
+    endpoint = f"/api/v1/execute/paper-orders?session_key={session_key}"
+    response = make_golang_api_call(
+        method="GET",
+        endpoint=endpoint,
+        base_url=base_url,
+    )
 
-    if requests is None:
-        import urllib.request, urllib.parse
-        final_url = f"{url}?{urllib.parse.urlencode(params)}"
-        req = urllib.request.Request(final_url, headers=headers, method="GET")
-        with urllib.request.urlopen(req, timeout=15) as resp:
-            response = json.loads(resp.read().decode("utf-8"))
-    else:
-        r = requests.get(url, params=params, headers=headers, timeout=15)
-        r.raise_for_status()
-        response = r.json()
-    
+    if not response:
+        return {
+            "success": False,
+            "error": "Failed to fetch paper orders (no response)",
+            "orders": [],
+            "session_key": session_key,
+            "count": 0,
+            "initial_balance": 1000.0,
+        }
+
     # Transform response to expected format
     return {
         "success": response.get("success", False),

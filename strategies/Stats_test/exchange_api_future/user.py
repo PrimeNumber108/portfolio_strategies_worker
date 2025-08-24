@@ -14,7 +14,7 @@ sys.path.insert(0, PROJECT_ROOT)
 
 # Import exchange future classes
 from exchange_api_future.binance_future.binance_future_private import BinanceFuturePrivate
-
+from logger import logger_error, logger_access, logger_database
 # Global dictionary to cache client instances
 clients_dict = {}
 
@@ -105,7 +105,7 @@ def get_client_exchange(exchange_name, acc_info='', symbol='BTC', quote="USDT", 
         return client
         
     except Exception as e:
-        print(f"❌ Error creating {exchange_name} future client: {e}")
+        logger_error.error(f"❌ Error creating {exchange_name} future client: {e}")
         raise
 
 def get_supported_exchanges():
@@ -148,10 +148,10 @@ def clear_client_cache(api_key=None):
     if api_key:
         if api_key in clients_dict:
             del clients_dict[api_key]
-            print(f"✅ Cleared cache for API key: {api_key[:8]}...")
+            logger_access.info(f"✅ Cleared cache for API key: {api_key[:8]}...")
     else:
         clients_dict.clear()
-        print("✅ Cleared all future client cache")
+        logger_access.info("✅ Cleared all future client cache")
 
 def get_client_info(api_key):
     """
@@ -197,8 +197,8 @@ def is_exchange_supported(exchange_name):
 
 # Example usage and testing
 if __name__ == "__main__":
-    print("🔧 Exchange Future Client Factory")
-    print("Supported exchanges:", get_supported_exchanges())
+    logger_access.info("🔧 Exchange Future Client Factory")
+    logger_access.info("Supported exchanges:", get_supported_exchanges())
     
     # Example account info structure
     example_acc_info = {
@@ -207,18 +207,18 @@ if __name__ == "__main__":
         "passphrase": "your_passphrase_here"  # Optional, not used by all exchanges
     }
     
-    print("\n📝 Example usage:")
-    print("client = get_client_exchange(")
-    print("    exchange_name='binance',")
-    print("    acc_info=account_info,")
-    print("    symbol='BTC',")
-    print("    quote='USDT'")
-    print(")")
+    logger_access.info("\n📝 Example usage:")
+    logger_access.info("client = get_client_exchange(")
+    logger_access.info("    exchange_name='binance',")
+    logger_access.info("    acc_info=account_info,")
+    logger_access.info("    symbol='BTC',")
+    logger_access.info("    quote='USDT'")
+    logger_access.info(")")
     
-    print("\n🔍 Available functions:")
-    print("- get_client_exchange(exchange_name, acc_info, symbol, quote, use_proxy)")
-    print("- get_supported_exchanges()")
-    print("- clear_client_cache(api_key=None)")
-    print("- get_client_info(api_key)")
-    print("- get_all_cached_clients()")
-    print("- is_exchange_supported(exchange_name)")
+    logger_access.info("\n🔍 Available functions:")
+    logger_access.info("- get_client_exchange(exchange_name, acc_info, symbol, quote, use_proxy)")
+    logger_access.info("- get_supported_exchanges()")
+    logger_access.info("- clear_client_cache(api_key=None)")
+    logger_access.info("- get_client_info(api_key)")
+    logger_access.info("- get_all_cached_clients()")
+    logger_access.info("- is_exchange_supported(exchange_name)")

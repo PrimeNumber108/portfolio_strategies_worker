@@ -5,7 +5,7 @@ import json
 import math
 import redis
 from pybit.unified_trading import HTTP
-from logger import logger_bybit, logger_error
+from logger import logger_bybit, logger_error, logger_access
 from utils import calculate_gap_hours,get_candle_data_info,convert_order_status, ORDER_PARTIALLY_FILLED
 sys.path.append(os.getcwd())
 
@@ -94,7 +94,7 @@ class BybitPrivate:
         """
         if order_id in self.order_dict:
             self.order_dict.pop(order_id)
-        # logger_temp.info(f'order_id {order_id}') #print(self.order_dict)
+        # logger_temp.info(f'order_id {order_id}') #logger_access.info(self.order_dict)
 
     def get_ticker(self, base = "", quote ="USDT"):
         """
@@ -245,7 +245,7 @@ class BybitPrivate:
                 quote_usdt_inventory += float(walletBalance)
             if coin == self.symbol:
                 base_inventory += float(walletBalance)
-        print(f"BYBIT: base_inventory: {base_inventory}, quote_inventory: {quote_inventory}, quote_usdt_inventory: {quote_usdt_inventory}")
+        logger_access.info(f"BYBIT: base_inventory: {base_inventory}, quote_inventory: {quote_inventory}, quote_usdt_inventory: {quote_usdt_inventory}")
         return base_inventory, quote_inventory, quote_usdt_inventory 
     
     def place_order(self, side_order, quantity, order_type, price ='', force = 'GTC', base = '', quote = 'USDT'):
@@ -300,7 +300,7 @@ class BybitPrivate:
             if re_place['retMsg'] == 'OK' or re_place['retCode'] == 0:
                 return {"code": 0, "data": re_place['result']}
         except Exception as e:
-            logger_bybit.error(f"{e} {e.__traceback__.tb_lineno}")
+            logger_error.error(f"{e} {e.__traceback__.tb_lineno}")
         return  False #result
     
     def cancel_order(self,order_id):
@@ -430,8 +430,8 @@ class BybitPrivate:
                     logger_bybit.info(f"2 :{details}")
                     return details 
         except Exception as e:
-            logger_bybit.error(f"{e} {e.__traceback__.tb_lineno}")
-            print(f"{e} {e.__traceback__.tb_lineno}")
+            logger_error.error(f"{e} {e.__traceback__.tb_lineno}")
+            logger_access.info(f"{e} {e.__traceback__.tb_lineno}")
         return {'data':None}
 
     def get_open_orders(self):
@@ -462,7 +462,7 @@ class BybitPrivate:
         # Create an empty list to store the formatted open orders
         open_list =[]
         # Iterate over each open order and format it
-        # print(open_orders,len(open_orders))
+        # logger_access.info(open_orders,len(open_orders))
         for item in open_orders:
             # Create a dictionary with the relevant information
             item_format = {
@@ -512,7 +512,7 @@ class BybitPrivate:
         }
         re =self.client.get_order_history(**kwargs)
         order = re['result']['list']
-        # print('order_detais:',order_detais)
+        # logger_access.info('order_detais:',order_detais)
         list_order = []
         for order_detais in order:
             details  = {
@@ -820,7 +820,7 @@ class BybitPrivate:
                 'interval': self.BYBIT_INTERVAL_MAP.get(interval, "60"),
                 'limit': limit,
             }
-        # print(kwargs)
+        # logger_access.info(kwargs)
         candles_list = self.client.get_kline(**kwargs)
         candles_list = candles_list['result']['list']
         candles = []
@@ -859,7 +859,7 @@ class BybitPrivate:
         redis_klines = get_candle_data_info(symbol_redis=f"{symbol_input}_{quote_input}", exchange_name="bybit", interval=interval, r=r)
         logger_bybit.warning(f'tick_number {tick_number}')
         if redis_klines is not None:
-            print('tick_number bybit', tick_number)
+            logger_access.info('tick_number bybit', tick_number)
             return {'data': redis_klines['candle'][-tick_number:]}
         result = self.get_candles(base = symbol_input,
                             quote = quote_input,

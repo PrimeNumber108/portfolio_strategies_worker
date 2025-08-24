@@ -10,7 +10,7 @@ from inspect import currentframe
 from dotenv import load_dotenv
 import redis
 from database_mm import insert_error_logger, update_strategy_tracking_status
-from logger import logger_database, logger_error
+from logger import logger_database, logger_error, logger_access
 r1 = redis.Redis(host='localhost', port=6379, decode_responses=True, db=1) # manage make_order
 r2 = redis.Redis(host='localhost', port=6379, decode_responses=True, db=2) # manage apikey - exchange
 r7 = redis.Redis(host='localhost', port=6379, decode_responses=True, db=7) # manage run_key strategy
@@ -43,7 +43,6 @@ def find_exp(number) -> int:
 
     """
     base10 = log10(abs(number))
-    #print("be10",base10)
     return abs(floor(base10))
 
 def get_precision_from_real_number(number):
@@ -58,16 +57,13 @@ def get_precision_from_real_number(number):
           of digits in the integer part. Otherwise, it returns the exponent of the number.
     """
     number = float(number)
-    #print("al", number)
     if number % 1 ==0:
         count =0
         while number > 1:
             number =number //10
-            #print(number)
             count +=1
         return -count
     precision = find_exp(number)
-    #print("precission", precision)
     return precision
 
 def generate_random_string():
@@ -117,7 +113,7 @@ def load_json(path):
         with open(path, 'r', encoding='utf-8') as f:
             return json.load(f)
     except Exception as e:
-        print(e)
+        logger_error.error(e)
         return None
     
 def save_json(path, data):
@@ -136,7 +132,7 @@ def save_json(path, data):
             json.dump(data, f, indent=4)
             return True
     except Exception as e:
-        print(e)
+        logger_error.error(e)
         return False
     
 def update_run_key_status(key, status):
@@ -158,14 +154,12 @@ def update_run_key_status(key, status):
     if status == 1:
         # key status must be starting before convert to started
         if int(current_status) != 0:
-            print("key status must be starting before convert to started")
             logger_database.error("key status must be starting before convert to started")
             return False
     # confirm key stopped
     elif status == 9:
         # key status must be stopping before convert to stopped
         if int(current_status) != 8:
-            print("key status must be stopping before convert to stopped")
             logger_database.error("key status must be stopping before convert to stopped")
             return False
     elif status == 8:

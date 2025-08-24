@@ -317,7 +317,6 @@ def main():
     if not config:
         return 1
     
-    # For now, just print "Hello World" and config info
     logger_access.info("\n" + "=" * 50)
     logger_access.info("🌍 Hello World from Python Strategy Runner!")
     logger_access.info("=" * 50)

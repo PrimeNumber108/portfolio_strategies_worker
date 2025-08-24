@@ -226,7 +226,6 @@ class BitgetPrivateNew:
         open_order_list = self.client_order.currentOrders(params=params)
         for item in open_order_list['data']:
             item['status'] = convert_order_status(item['status'])
-        # logger_temp.info(f'open_order_list {open_order_list}') #print(self.order_dict)
         return open_order_list
     
     def get_order_details(self, order_id, base="", quote = "USDT"):
@@ -437,11 +436,8 @@ class BitgetPrivateNew:
             result = self.client_account.assets(params = params)
             asset = result['data'][0]
             total = float(asset['available']) + float(asset['locked']) + float(asset['frozen'])
-            # print('total', total)
             balances_spot_keys = f'{symbol}'
-            # print('balances_spot_keys', balances_spot_keys)
             balances_spot[balances_spot_keys] = total
-            # print('balances_spot',balances_spot)
             if symbol not in balance_asset_temp:
                 balance_asset_temp[symbol] = 0
             balance_asset_temp[symbol] += total

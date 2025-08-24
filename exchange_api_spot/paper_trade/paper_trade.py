@@ -29,7 +29,7 @@ from utils import (
     generate_random_string,
     make_golang_api_call
 )
-from logger import logger_database, logger_error
+from logger import logger_database, logger_error, logger_access
 
 # Redis configuration
 r = redis.Redis(host='localhost', port=6379, decode_responses=True)
@@ -82,7 +82,7 @@ class PaperTrade:
         # Initialize account balances via Go API if not exists
         self._init_account_balance()
         
-        print(f"✅ Paper Trade initialized for {self.symbol}/{self.quote} using {self.exchange} data")
+        logger_access.info(f"✅ Paper Trade initialized for {self.symbol}/{self.quote} using {self.exchange} data")
         logger_database.info(f"Paper Trade initialized: {self.symbol}/{self.quote}, exchange: {self.exchange}")
 
     def _load_scales(self):
@@ -93,13 +93,13 @@ class PaperTrade:
                 scale = json.loads(scale_redis)
                 self.price_scale = int(scale.get("priceScale", 2))
                 self.qty_scale = int(scale.get("qtyScale", 6))
-                print(f"📊 Loaded scales from Redis - Price: {self.price_scale}, Qty: {self.qty_scale}")
+                logger_access.info(f"📊 Loaded scales from Redis - Price: {self.price_scale}, Qty: {self.qty_scale}")
             else:
                 # Try to get scales from exchange data
                 self.price_scale, self.qty_scale = self.get_scale()
-                print(f"📊 Fetched new scales - Price: {self.price_scale}, Qty: {self.qty_scale}")
+                logger_access.info(f"📊 Fetched new scales - Price: {self.price_scale}, Qty: {self.qty_scale}")
         except Exception as e:
-            print(f"⚠️ Could not load scales, using defaults: {e}")
+            logger_error.error(f"⚠️ Could not load scales, using defaults: {e}")
             self.price_scale = 2
             self.qty_scale = 6
 
@@ -114,7 +114,7 @@ class PaperTrade:
             )
             
             if balance_response and balance_response.get('success') and balance_response.get('data'):
-                print(f"✅ Paper balances already exist for session {self.session_key}")
+                logger_access.info(f"✅ Paper balances already exist for session {self.session_key}")
                 return
             
             # Initialize balances if they don't exist
@@ -133,14 +133,14 @@ class PaperTrade:
             )
             
             if response and response.get('success'):
-                print(f"✅ Initialized paper balance: {self.initial_balance} {self.quote}")
+                logger_access.info(f"✅ Initialized paper balance: {self.initial_balance} {self.quote}")
                 logger_database.info(f"Initialized paper balance for session {self.session_key}")
             else:
                 error_msg = response.get('error', 'Unknown error') if response else 'No response from API'
-                print(f"⚠️ Failed to initialize balances: {error_msg}")
+                logger_access.info(f"⚠️ Failed to initialize balances: {error_msg}")
                 
         except Exception as e:
-            print(f"❌ Failed to initialize account balance: {e}")
+            logger_error.error(f"❌ Failed to initialize account balance: {e}")
             logger_error.error(f"Paper balance init error: {e}")
 
 
@@ -178,11 +178,11 @@ class PaperTrade:
                         self.price_scale = price_scale
                         self.qty_scale = qty_scale
                     
-                    print(f"📊 Got scales from {self.exchange} exchange - Price: {price_scale}, Qty: {qty_scale}")
+                    logger_access.info(f"📊 Got scales from {self.exchange} exchange - Price: {price_scale}, Qty: {qty_scale}")
                     return price_scale, qty_scale
                         
             except Exception as e:
-                print(f"⚠️ Could not get scales from {self.exchange} exchange: {e}")
+                logger_error.error(f"⚠️ Could not get scales from {self.exchange} exchange: {e}")
             
             # Fallback to Redis cache
             scale_key = f'{symbol_redis}_{self.exchange}_scale'
@@ -198,14 +198,14 @@ class PaperTrade:
                     self.price_scale = price_scale
                     self.qty_scale = qty_scale
                 
-                print(f"📊 Got scales from Redis cache - Price: {price_scale}, Qty: {qty_scale}")
+                logger_access.info(f"📊 Got scales from Redis cache - Price: {price_scale}, Qty: {qty_scale}")
                 return price_scale, qty_scale
             else:
-                print(f"⚠️ No scale data found for {symbol_redis}_{self.exchange}, using defaults")
+                logger_access.info(f"⚠️ No scale data found for {symbol_redis}_{self.exchange}, using defaults")
                 return 2, 6  # Default scales
                 
         except Exception as e:
-            print(f"❌ Error getting scale: {e}")
+            logger_error.error(f"❌ Error getting scale: {e}")
             logger_error.error(f"Paper trade get_scale error: {e}")
             return 2, 6
 
@@ -230,23 +230,23 @@ class PaperTrade:
                 
                 if exchange_client and hasattr(exchange_client, 'get_price'):
                     price_data = exchange_client.get_price(base, quote)
-                    print('price_data: ',price_data)
+                    logger_access.info('price_data: ',price_data)
                     if price_data:
                         # Cache the result in Redis for future use
                         price_key = f'{symbol_redis}_{self.exchange}_price'
                         self.r.set(price_key, json.dumps(price_data))
                         
-                        print(f"💰 Got price from {self.exchange} exchange: {price_data.get('price', 'N/A')}")
+                        logger_access.info(f"💰 Got price from {self.exchange} exchange: {price_data.get('price', 'N/A')}")
                         return price_data
                         
             except Exception as e:
-                print(f"⚠️ Could not get price from {self.exchange} exchange: {e}")
+                logger_error.error(f"⚠️ Could not get price from {self.exchange} exchange: {e}")
             
           
             return None
             
         except Exception as e:
-            print(f"❌ Error getting price: {e}")
+            logger_error.error(f"❌ Error getting price: {e}")
             logger_error.error(f"Paper trade get_price error: {e}")
             return None
 
@@ -280,11 +280,11 @@ class PaperTrade:
                         ticker_key = f'{symbol_redis}_{self.exchange}_ticker'
                         self.r.set(ticker_key, json.dumps(ticker_data))
                         
-                        print(f"📊 Got ticker from {self.exchange} exchange")
+                        logger_access.info(f"📊 Got ticker from {self.exchange} exchange")
                         return ticker_data
                         
             except Exception as e:
-                print(f"⚠️ Could not get ticker from {self.exchange} exchange: {e}")
+                logger_error.error(f"⚠️ Could not get ticker from {self.exchange} exchange: {e}")
             
             # Fallback to Redis cache
             ticker_key = f'{symbol_redis}_{self.exchange}_ticker'
@@ -293,7 +293,7 @@ class PaperTrade:
             if ticker_data:
                 data = json.loads(ticker_data)
                 if isinstance(data, dict):
-                    print(f"📊 Got ticker from Redis cache")
+                    logger_access.info(f"📊 Got ticker from Redis cache")
                     return data
             
             # Fallback to price data if ticker not available
@@ -308,14 +308,14 @@ class PaperTrade:
                     "baseVolume": "0",
                     "quoteVolume": "0"
                 }
-                print(f"📊 Generated ticker from price data")
+                logger_access.info(f"📊 Generated ticker from price data")
                 return ticker
             
-            print(f"⚠️ No ticker data found for {symbol_redis}_{self.exchange}")
+            logger_access.info(f"⚠️ No ticker data found for {symbol_redis}_{self.exchange}")
             return {}
             
         except Exception as e:
-            print(f"❌ Error getting ticker: {e}")
+            logger_error.error(f"❌ Error getting ticker: {e}")
             logger_error.error(f"Paper trade get_ticker error: {e}")
             return {}
 
@@ -349,11 +349,11 @@ class PaperTrade:
                         # Cache the result in Redis for future use (optional, as candles are large)
                         # We could implement caching here if needed
                         
-                        print(f"📈 Got {len(candle_data.get('candle', []))} candles from {self.exchange} exchange")
+                        logger_access.info(f"📈 Got {len(candle_data.get('candle', []))} candles from {self.exchange} exchange")
                         return candle_data
                         
             except Exception as e:
-                print(f"⚠️ Could not get candles from {self.exchange} exchange: {e}")
+                logger_error.error(f"⚠️ Could not get candles from {self.exchange} exchange: {e}")
             
             # Fallback to Redis cache
             redis_klines = get_candle_data_info(
@@ -375,17 +375,17 @@ class PaperTrade:
                 else:
                     candles = candles[-limit:] if limit else candles
                 
-                print(f"📈 Got {len(candles)} candles from Redis cache")
+                logger_access.info(f"📈 Got {len(candles)} candles from Redis cache")
                 return {
                     "ts": int(time.time() * 1000),
                     "candle": candles
                 }
             
-            print(f"⚠️ No candle data found for {symbol_redis}_{self.exchange}")
+            logger_access.info(f"⚠️ No candle data found for {symbol_redis}_{self.exchange}")
             return {"ts": int(time.time() * 1000), "candle": []}
             
         except Exception as e:
-            print(f"❌ Error getting candles: {e}")
+            logger_error.error(f"❌ Error getting candles: {e}")
             logger_error.error(f"Paper trade get_candles error: {e}")
             return {"ts": int(time.time() * 1000), "candle": []}
 
@@ -410,11 +410,11 @@ class PaperTrade:
                 return {'data': response.get('data', {})}
             else:
                 error_msg = response.get('error', 'Unknown error') if response else 'No response from API'
-                print(f"❌ Error getting account balance: {error_msg}")
+                logger_access.info(f"❌ Error getting account balance: {error_msg}")
                 return {'data': {}}
                 
         except Exception as e:
-            print(f"❌ Error getting account balance: {e}")
+            logger_error.error(f"❌ Error getting account balance: {e}")
             logger_error.error(f"Paper trade get_account_balance error: {e}")
             return {'data': {}}
 
@@ -451,11 +451,11 @@ class PaperTrade:
                         }
                     }
             else:
-                print(f"❌ Error getting account assets: {response.get('error', 'Unknown error') if response else 'No response'}")
+                logger_access.info(f"❌ Error getting account assets: {response.get('error', 'Unknown error') if response else 'No response'}")
                 return {'data': {}}
                 
         except Exception as e:
-            print(f"❌ Error getting account assets: {e}")
+            logger_error.error(f"❌ Error getting account assets: {e}")
             logger_error.error(f"Paper trade get_account_assets error: {e}")
             return {'data': {}}
 
@@ -484,7 +484,7 @@ class PaperTrade:
             return float(base_inventory), float(quote_inventory), float(usdt_inventory)
             
         except Exception as e:
-            print(f"❌ Error getting user assets: {e}")
+            logger_error.error(f"❌ Error getting user assets: {e}")
             logger_error.error(f"Paper trade get_user_asset error: {e}")
             return 0.0, 0.0, 0.0
 
@@ -513,7 +513,7 @@ class PaperTrade:
                 }
             
             current_price = float(current_price_data['price'])
-            print('current_price:: ',current_price)
+            logger_access.info('current_price:: ',current_price)
             # Determine execution price
             if order_type.upper() == 'MARKET':
                 execution_price = current_price
@@ -543,7 +543,7 @@ class PaperTrade:
             if response and response.get('success'):
                 order_result = response.get('data', {})
                 
-                print(f"✅ Paper trade order placed: {side_order} {quantity} {self.base} at {execution_price}")
+                logger_access.info(f"✅ Paper trade order placed: {side_order} {quantity} {self.base} at {execution_price}")
                 logger_database.info(f"Paper trade order: {order_result.get('order_id')}, {side_order}, {quantity}@{execution_price}")
                 
                 return {
@@ -565,7 +565,7 @@ class PaperTrade:
                 }
             else:
                 error_msg = response.get('error', 'Unknown error') if response else 'No response from API'
-                print(f"❌ Failed to place paper order: {error_msg}")
+                logger_access.info(f"❌ Failed to place paper order: {error_msg}")
                 return {
                     'code': -1,
                     'message': f'Paper trade order failed: {error_msg}',
@@ -573,7 +573,7 @@ class PaperTrade:
                 }
             
         except Exception as e:
-            print(f"❌ Error placing paper trade order: {e}")
+            logger_error.error(f"❌ Error placing paper trade order: {e}")
             logger_error.error(f"Paper trade place_order error: {e}")
             update_key_and_insert_error_log(
                 self.session_key, self.symbol, get_line_number(),
@@ -629,11 +629,11 @@ class PaperTrade:
                     "updateTime": order_data.get("update_time")
                 }
             else:
-                print(f"❌ Order not found or API error: {response.get('error') if response else 'No response'}")
+                logger_access.info(f"❌ Order not found or API error: {response.get('error') if response else 'No response'}")
                 return None
                 
         except Exception as e:
-            print(f"❌ Error getting order details: {e}")
+            logger_error.error(f"❌ Error getting order details: {e}")
             logger_error.error(f"Paper trade get_order_details error: {e}")
             return None
 
@@ -682,11 +682,11 @@ class PaperTrade:
                 
                 return {"data": orders}
             else:
-                print(f"❌ Error getting open orders: {response.get('error') if response else 'No response'}")
+                logger_access.info(f"❌ Error getting open orders: {response.get('error') if response else 'No response'}")
                 return {"data": []}
                 
         except Exception as e:
-            print(f"❌ Error getting open orders: {e}")
+            logger_error.error(f"❌ Error getting open orders: {e}")
             logger_error.error(f"Paper trade get_open_orders error: {e}")
             return {"data": []}
 
@@ -710,15 +710,15 @@ class PaperTrade:
             )
             
             if response and response.get('success'):
-                print(f"✅ Paper trade order {order_id} canceled")
+                logger_access.info(f"✅ Paper trade order {order_id} canceled")
                 return {'code': 0, 'message': 'Order canceled successfully'}
             else:
                 error_msg = response.get('error', 'Unknown error') if response else 'No response from API'
-                print(f"❌ Failed to cancel order: {error_msg}")
+                logger_access.info(f"❌ Failed to cancel order: {error_msg}")
                 return {'code': -1, 'message': f'Cancel failed: {error_msg}'}
                 
         except Exception as e:
-            print(f"❌ Error canceling order: {e}")
+            logger_error.error(f"❌ Error canceling order: {e}")
             logger_error.error(f"Paper trade cancel_order error: {e}")
             return {'code': -1, 'message': f'Cancel failed: {str(e)}'}
 
@@ -762,7 +762,7 @@ class PaperTrade:
             return total_balance
             
         except Exception as e:
-            print(f"❌ Error generating account snapshot: {e}")
+            logger_error.error(f"❌ Error generating account snapshot: {e}")
             logger_error.error(f"Paper trade snap_shot_account error: {e}")
             return []
 
@@ -799,16 +799,16 @@ class PaperTrade:
             return {'data': candles_data.get('candle', [])}
             
         except Exception as e:
-            print(f"❌ Error getting volume data: {e}")
+            logger_error.error(f"❌ Error getting volume data: {e}")
             logger_error.error(f"Paper trade get_volume_by_interval error: {e}")
             return {'data': []}
 
 
 # def main():
 #     """Test function for paper trading"""
-#     print("🧪 Testing Paper Trade functionality...")
-#     print("⚠️  Make sure the Go API server is running at http://localhost:8080")
-#     print("-" * 60)
+#     logger_access.info("🧪 Testing Paper Trade functionality...")
+#     logger_access.info("⚠️  Make sure the Go API server is running at http://localhost:8080")
+#     logger_access.info("-" * 60)
     
 #     # Set environment for testing
 #     # os.environ['PAPER_TRADE_EXCHANGE'] = 'binance'  # Use binance data for pricing
@@ -822,45 +822,45 @@ class PaperTrade:
 #     )
     
 #     # Test get price from Redis
-#     print("\n1️⃣ Testing price retrieval from Redis...")
+#     logger_access.info("\n1️⃣ Testing price retrieval from Redis...")
 #     price = paper_trader.get_price()
-#     print(f"📊 Current price: {price}")
+#     logger_access.info(f"📊 Current price: {price}")
     
 #     # Test get balance via API
-#     print("\n2️⃣ Testing balance retrieval via Go API...")
+#     logger_access.info("\n2️⃣ Testing balance retrieval via Go API...")
 #     balance = paper_trader.get_account_balance()
-#     print(f"💰 Account balance: {balance}")
+#     logger_access.info(f"💰 Account balance: {balance}")
     
 #     # Test place order via API
 #     if price and price.get('price'):
-#         print(f"\n3️⃣ Testing order placement via Go API...")
+#         logger_access.info(f"\n3️⃣ Testing order placement via Go API...")
 #         order_result = paper_trader.place_order(
 #             side_order='BUY',
 #             quantity=0.001,
 #             order_type='MARKET'
 #         )
-#         print(f"📝 Order result: {order_result}")
+#         logger_access.info(f"📝 Order result: {order_result}")
         
 #         # Check balance after order
-#         print(f"\n4️⃣ Testing balance after trade...")
+#         logger_access.info(f"\n4️⃣ Testing balance after trade...")
 #         balance_after = paper_trader.get_account_balance()
-#         print(f"💰 Balance after trade: {balance_after}")
+#         logger_access.info(f"💰 Balance after trade: {balance_after}")
         
 #         # Test order details
 #         if order_result.get('code') == 0:
 #             order_id = order_result['data']['orderId']
-#             print(f"\n5️⃣ Testing order details retrieval...")
+#             logger_access.info(f"\n5️⃣ Testing order details retrieval...")
 #             order_details = paper_trader.get_order_details(order_id)
-#             print(f"📋 Order details: {order_details}")
+#             logger_access.info(f"📋 Order details: {order_details}")
 #     else:
-#         print("⚠️  Cannot place order - no price data available")
-#         print("💡 Make sure Redis has price data for BTC_USDT_binance_price")
+#         logger_access.info("⚠️  Cannot place order - no price data available")
+#         logger_access.info("💡 Make sure Redis has price data for BTC_USDT_binance_price")
 
-#     print("\n✅ Paper trading test completed!")
-#     print("🔧 To use paper trading in strategies:")
-#     print("   - Set GOLANG_API_URL environment variable if API is not on localhost:8080")
-#     print("   - Set PAPER_TRADE_EXCHANGE to specify which exchange data to use for pricing")
-#     print("   - Use PAPER_MODE=True and appropriate EXCHANGE environment variable in get_client_exchange()")
+#     logger_access.info("\n✅ Paper trading test completed!")
+#     logger_access.info("🔧 To use paper trading in strategies:")
+#     logger_access.info("   - Set GOLANG_API_URL environment variable if API is not on localhost:8080")
+#     logger_access.info("   - Set PAPER_TRADE_EXCHANGE to specify which exchange data to use for pricing")
+#     logger_access.info("   - Use PAPER_MODE=True and appropriate EXCHANGE environment variable in get_client_exchange()")
 
 
 # if __name__ == "__main__":

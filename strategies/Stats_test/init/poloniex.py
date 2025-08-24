@@ -15,7 +15,7 @@ CURRENT_DIR = os.path.dirname(os.path.abspath(__file__))
 PROJECT_ROOT = os.path.abspath(os.path.join(CURRENT_DIR, "../"))
 sys.path.insert(0, PROJECT_ROOT)
 
-from logger import logger_database, logger_error
+from logger import logger_database, logger_error, logger_access
 from exchange_api_spot.user import get_client_exchange
 from utils import (
     get_line_number,
@@ -56,10 +56,10 @@ class PoloniexBalanceChecker:
                 quote=self.quote,
                 use_proxy=False  # Disable proxy to avoid connection issues
             )
-            print(f"Poloniex client initialized successfully for session: {session_id}")
+            logger_access.info(f"Poloniex client initialized successfully for session: {session_id}")
             logger_database.info(f"Poloniex balance checker initialized for session: {session_id}")
         except Exception as e:
-            print(f"Failed to initialize Poloniex client: {e}")
+            logger_error.error(f"Failed to initialize Poloniex client: {e}")
             logger_error.error(f"Failed to initialize Poloniex client for session {session_id}: {e}")
             raise
 
@@ -71,7 +71,7 @@ class PoloniexBalanceChecker:
             dict: Complete balance information for all assets with prices in the requested format
         """
         try:
-            print(f"Fetching all account balances for session: {self.session_id}")
+            logger_access.info(f"Fetching all account balances for session: {self.session_id}")
             logger_database.info(f"Fetching all account balances for session: {self.session_id}")
             
             # Get account balance using get_account_balance() method
@@ -79,7 +79,7 @@ class PoloniexBalanceChecker:
             
             if not balance_data or 'data' not in balance_data:
                 error_msg = "No balance data received from get_account_balance() API"
-                print(f"{error_msg}")
+                logger_access.info(f"{error_msg}")
                 logger_error.error(f"Balance fetch failed for session {self.session_id}: {error_msg}")
                 
                 return {
@@ -92,7 +92,7 @@ class PoloniexBalanceChecker:
                 }
             
             balances = balance_data['data']
-            print(f"  Retrieved {len(balances)} assets from get_account_balance()")
+            logger_access.info(f"  Retrieved {len(balances)} assets from get_account_balance()")
             
             # Format balance data with prices in the requested format
             formatted_balances = {}
@@ -112,7 +112,7 @@ class PoloniexBalanceChecker:
                                 ticker_data = self.client.get_ticker(asset_symbol, "USDT")
                                 price = float(ticker_data.get('last', 0)) if ticker_data else 0.0
                             except Exception as ticker_error:
-                                print(f" Could not get ticker for {asset_symbol}_USDT: {ticker_error}")
+                                logger_error.error(f" Could not get ticker for {asset_symbol}_USDT: {ticker_error}")
                                 # Try get_price method if available
                                 try:
                                     # Create a temporary client with the asset as base
@@ -131,7 +131,7 @@ class PoloniexBalanceChecker:
                                     price_data = temp_client.get_price()
                                     price = float(price_data.get('price', 0)) if price_data else 0.0
                                 except Exception as price_error:
-                                    print(f" Could not get price for {asset_symbol}: {price_error}")
+                                    logger_error.error(f" Could not get price for {asset_symbol}: {price_error}")
                                     price = 0.0
                         
                         # Add to formatted balances in the requested format
@@ -144,10 +144,10 @@ class PoloniexBalanceChecker:
                         usd_value = amount * price
                         total_value_usd += usd_value
                         
-                        print(f"{asset_symbol}: Amount: {amount:.8f}, Price: ${price:.8f}, Value: ${usd_value:.2f}")
+                        logger_access.info(f"{asset_symbol}: Amount: {amount:.8f}, Price: ${price:.8f}, Value: ${usd_value:.2f}")
                         
                     except Exception as price_error:
-                        print(f" Error processing {asset_symbol}: {price_error}")
+                        logger_error.error(f" Error processing {asset_symbol}: {price_error}")
                         # Still add the asset with 0 price
                         formatted_balances[asset_symbol] = {
                             "amount": amount,
@@ -156,14 +156,14 @@ class PoloniexBalanceChecker:
             
             formatted_balances["Total"] = total_value_usd
             
-            print(f" Successfully retrieved {len(formatted_balances)-1} assets with balance > 0")
-            print(f"💰 Total portfolio value: ${total_value_usd:.2f} USD")
+            logger_access.info(f" Successfully retrieved {len(formatted_balances)-1} assets with balance > 0")
+            logger_access.info(f"💰 Total portfolio value: ${total_value_usd:.2f} USD")
             logger_database.info(f"Successfully retrieved account balance for session: {self.session_id}")
             return formatted_balances
                 
         except Exception as e:
             error_msg = f"Error fetching account balance: {str(e)}"
-            print(f" {error_msg}")
+            logger_error.error(f" {error_msg}")
             logger_error.error(f"Balance fetch exception for session {self.session_id}: {error_msg}")
             
             update_key_and_insert_error_log(
@@ -190,7 +190,7 @@ class PoloniexBalanceChecker:
             dict: Balance information for the specific asset
         """
         try:
-            print(f"  Fetching {asset_symbol} balance for session: {self.session_id}")
+            logger_access.info(f"  Fetching {asset_symbol} balance for session: {self.session_id}")
             logger_database.info(f"Fetching {asset_symbol} balance for session: {self.session_id}")
             
             balance_data = self.client.get_account_assets(asset_symbol)
@@ -210,13 +210,13 @@ class PoloniexBalanceChecker:
                     "message": f"{asset_symbol} balance retrieved successfully"
                 }
                 
-                print(f" {asset_symbol} balance: Available: {balance['available']:.8f}, Locked: {balance['locked']:.8f}, Total: {balance['total']:.8f}")
+                logger_access.info(f" {asset_symbol} balance: Available: {balance['available']:.8f}, Locked: {balance['locked']:.8f}, Total: {balance['total']:.8f}")
                 logger_database.info(f"{asset_symbol} balance retrieved successfully for session: {self.session_id}")
                 return result
                 
             else:
                 error_msg = f"No {asset_symbol} balance found"
-                print(f" {error_msg}")
+                logger_access.info(f" {error_msg}")
                 logger_error.warning(f"{asset_symbol} balance not found for session {self.session_id}")
                 
                 return {
@@ -233,7 +233,7 @@ class PoloniexBalanceChecker:
                 
         except Exception as e:
             error_msg = f"Error fetching {asset_symbol} balance: {str(e)}"
-            print(f" {error_msg}")
+            logger_error.error(f" {error_msg}")
             logger_error.error(f"{asset_symbol} balance fetch exception for session {self.session_id}: {error_msg}")
             
             update_key_and_insert_error_log(
@@ -267,34 +267,34 @@ class PoloniexBalanceChecker:
         Returns:
             dict: Balance information in the requested format
         """
-        print(f" Session ID: {self.session_id}")
-        print(f"Asset Filter: {asset_filter if asset_filter else 'All assets'}")
-        print("-" * 50)
+        logger_access.info(f" Session ID: {self.session_id}")
+        logger_access.info(f"Asset Filter: {asset_filter if asset_filter else 'All assets'}")
+        logger_access.info("-" * 50)
         
         try:
             if asset_filter:
                 result = self.get_specific_asset_balance(asset_filter)
-                print("-" * 50)
+                logger_access.info("-" * 50)
                 if result.get('success'):
-                    print(" Balance check completed successfully!")
+                    logger_access.info(" Balance check completed successfully!")
                 else:
-                    print(" Balance check failed!")
-                print('result is: ',result)
+                    logger_access.info(" Balance check failed!")
+                logger_access.info('result is: ',result)
                 return result
             else:
                 # For all balances, return the new format
                 result = self.get_all_balances()
-                print("-" * 50)
+                logger_access.info("-" * 50)
                 if 'Total' in result:
-                    print(" Balance check completed successfully!")
+                    logger_access.info(" Balance check completed successfully!")
                 else:
-                    print(" Balance check failed!")
-                print('result is: ',result)
+                    logger_access.info(" Balance check failed!")
+                logger_access.info('result is: ',result)
                 return result
             
         except Exception as e:
             error_msg = f"Balance check error: {str(e)}"
-            print(f" {error_msg}")
+            logger_error.error(f" {error_msg}")
             logger_error.error(f"Balance check error for session {self.session_id}: {error_msg}")
             
             update_key_and_insert_error_log(
@@ -314,7 +314,7 @@ def main():
     """
     Main function to run the balance checker
     """
-    print("🔍 Running Poloniex Balance Checker...")
+    logger_access.info("🔍 Running Poloniex Balance Checker...")
     
     API_KEY = os.environ.get('STRATEGY_API_KEY', '')
     SECRET_KEY = os.environ.get('STRATEGY_API_SECRET', '')
@@ -329,9 +329,9 @@ def main():
        
         
         # Output JSON for Golang to parse
-        print("\n" + "="*50)
-        print("RESULT:")
-        print(json.dumps(error_result, indent=2))
+        logger_access.info("\n" + "="*50)
+        logger_access.info("RESULT:")
+        logger_access.info(json.dumps(error_result, indent=2))
         return error_result
     
     try:
@@ -347,9 +347,9 @@ def main():
         result = checker.check_balance(asset_filter=ASSET_FILTER if ASSET_FILTER else None)
         
         # Output JSON for Golang to parse
-        print("\n" + "="*50)
-        print("RESULT:")
-        print(json.dumps(result, indent=2))
+        logger_access.info("\n" + "="*50)
+        logger_access.info("RESULT:")
+        logger_access.info(json.dumps(result, indent=2))
         
         return result
         
@@ -357,11 +357,11 @@ def main():
         error_result = {
             "Total": 0.0
         }
-        print(f" Fatal error: {e}")
+        logger_error.error(f" Fatal error: {e}")
         
-        print("\n" + "="*50)
-        print("RESULT:")
-        print(json.dumps(error_result, indent=2))
+        logger_error.error("\n" + "="*50)
+        logger_error.error("RESULT:")
+        logger_error.error(json.dumps(error_result, indent=2))
         return error_result
 
 if __name__ == "__main__":

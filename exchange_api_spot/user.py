@@ -26,8 +26,6 @@ clients_dict = {}
 
 PAPER_MODE = PAPER_MODE if PAPER_MODE else False
 
-logger_error.error("PAPER_MODE trading mode enabled: ",PAPER_MODE)
-
 def get_client_exchange(exchange_name = "", acc_info='', symbol='BTC', quote="USDT", session_key="", paper_mode=False):
     """
     Creates and returns a client object for the specified exchange.
@@ -45,9 +43,9 @@ def get_client_exchange(exchange_name = "", acc_info='', symbol='BTC', quote="US
     """
     client = None
     exchange_name = EXCHANGE or exchange_name 
-    logger_error.error("PAPER_MODE 2: ",PAPER_MODE)
     
-    # PAPER_MODE =  'true'
+    PAPER_MODE = 'true'
+    # logger_error.error("PAPER_MODE 2: ",PAPER_MODE)
     try:
         # Check if client already exists in cache
         if acc_info and "api_key" in acc_info and acc_info["api_key"] in clients_dict:
@@ -101,7 +99,7 @@ def get_client_exchange(exchange_name = "", acc_info='', symbol='BTC', quote="US
         return client
         
     except Exception as e:
-        print(f"❌ Error creating {exchange_name} client: {e}")
+        logger_error.error(f"❌ Error creating {exchange_name} client: {e}")
         raise
 
 def _get_client_exchange(exchange_name = "", acc_info='', symbol='BTC', quote="USDT", session_key=""):
@@ -170,10 +168,10 @@ def _get_client_exchange(exchange_name = "", acc_info='', symbol='BTC', quote="U
 # Example usage and testing
 if __name__ == "__main__":
     
-    print("\n📝 Example usage:")
-    print("client = get_client_exchange(")
-    print("    exchange_name='binance',")
-    print("    acc_info=account_info,")
-    print("    symbol='BTC',")
-    print("    quote='USDT'")
-    print(")")
+    logger_access.info("\n📝 Example usage:")
+    logger_access.info("client = get_client_exchange(")
+    logger_access.info("    exchange_name='binance',")
+    logger_access.info("    acc_info=account_info,")
+    logger_access.info("    symbol='BTC',")
+    logger_access.info("    quote='USDT'")
+    logger_access.info(")")

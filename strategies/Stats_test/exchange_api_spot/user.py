@@ -17,6 +17,7 @@ from exchange_api_spot.binance.binance_private_new import BinancePrivateNew
 from exchange_api_spot.binance.binance_private import BinancePrivate
 from exchange_api_spot.poloniex.poloniex_private import PoloniexPrivate
 
+from logger import logger_access, logger_error
 # Global dictionary to cache client instances
 clients_dict = {}
 
@@ -115,17 +116,10 @@ def get_client_exchange(exchange_name, acc_info='', symbol='BTC', quote="USDT", 
         return client
         
     except Exception as e:
-        print(f"❌ Error creating {exchange_name} client: {e}")
+        logger_error.error(f"❌ Error creating {exchange_name} client: {e}")
         raise
 
 
 # Example usage and testing
 if __name__ == "__main__":
-    
-    print("\n📝 Example usage:")
-    print("client = get_client_exchange(")
-    print("    exchange_name='binance',")
-    print("    acc_info=account_info,")
-    print("    symbol='BTC',")
-    print("    quote='USDT'")
-    print(")")
+   

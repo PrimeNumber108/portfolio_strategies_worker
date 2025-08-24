@@ -4,7 +4,7 @@ import json
 import redis
 from  binance.client import Client
 from utils import convert_order_status
-from logger import logger_error
+from logger import logger_error, logger_access, logger_database
 
 r = redis.Redis(host='localhost', port=6379, decode_responses=True)
 class BinanceFuturePrivate:
@@ -48,16 +48,16 @@ class BinanceFuturePrivate:
                             tick_size = float(filter_item['tickSize'])
                             if tick_size > 0:
                                 price_scale = int(-math.log10(tick_size))
-                            print(f'PRICE_FILTER: tickSize={tick_size}, price_scale={price_scale}')
+                            logger_access.info(f'PRICE_FILTER: tickSize={tick_size}, price_scale={price_scale}')
                         
                         elif filter_item['filterType'] == 'LOT_SIZE':
                             step_size = float(filter_item['stepSize'])
                             if step_size > 0:
                                 qty_scale = int(-math.log10(step_size))
-                            print(f'LOT_SIZE: stepSize={step_size}, qty_scale={qty_scale}')
+                            logger_access.info(f'LOT_SIZE: stepSize={step_size}, qty_scale={qty_scale}')
                     
                   
-                    print(f'Cached scales: price_scale={price_scale}, qty_scale={qty_scale}')
+                    logger_access.info(f'Cached scales: price_scale={price_scale}, qty_scale={qty_scale}')
                     
                     return price_scale, qty_scale
             
@@ -65,7 +65,7 @@ class BinanceFuturePrivate:
             
         except Exception as e:
             logger_error.error("Error getting scale: %s", e)
-            print(f"Error getting scale: {e}")
+            logger_error.error(f"Error getting scale: {e}")
             return 2, 3  # Default values
 
     def delete_full_filled_order(self, order_id):
@@ -136,7 +136,7 @@ class BinanceFuturePrivate:
                 - total (float): The total balance.
         """
         result = self.trade.futures_account_balance()
-        # print(result)
+        # logger_access.info(result)
         data ={"asset": '',
                     "free": 0,
                     "available": 0,
@@ -146,7 +146,7 @@ class BinanceFuturePrivate:
                     "total": 0}
         for asset in result:
             if asset["asset"] == coin:
-                # print('asset',asset["asset"])
+                # logger_access.info('asset',asset["asset"])
                 data = {
                     "asset": asset["asset"],
                     "free": float(asset["availableBalance"]),
@@ -616,7 +616,7 @@ class BinanceFuturePrivate:
             
             close_qty = round(close_qty, self.qty_scale)
             
-            print(f"Closing {percentage}% of {full_symbol} position: {side} {close_qty}")
+            logger_access.info(f"Closing {percentage}% of {full_symbol} position: {side} {close_qty}")
             
             # Place market order to close position
             params = {
@@ -630,14 +630,14 @@ class BinanceFuturePrivate:
             result = self.trade.futures_create_order(**params)
             
             if "orderId" in result:
-                print(f"Position close order placed: {result['orderId']}")
+                logger_access.info(f"Position close order placed: {result['orderId']}")
                 return {"code": 0, "data": result, "msg": f"Position closed successfully"}
             else:
                 return {"code": -1, "data": result, "msg": "Failed to place close order"}
                 
         except Exception as e:
             logger_error.error("Error closing position: %s", e)
-            print(f"Error closing position: {e}")
+            logger_error.error(f"Error closing position: {e}")
             return {"code": -1, "msg": str(e)}
     
     def close_all_positions(self):
@@ -672,7 +672,7 @@ class BinanceFuturePrivate:
                 close_qty = abs(position_amt)
                 
                 try:
-                    print(f"Closing position for {symbol}: {side} {close_qty}")
+                    logger_access.info(f"Closing position for {symbol}: {side} {close_qty}")
                     
                     # Place market order to close position
                     params = {
@@ -694,7 +694,7 @@ class BinanceFuturePrivate:
                             "status": "success"
                         })
                         closed_count += 1
-                        print(f"Closed position for {symbol}: Order {result['orderId']}")
+                        logger_access.info(f"Closed position for {symbol}: Order {result['orderId']}")
                     else:
                         results.append({
                             "symbol": symbol,
@@ -702,7 +702,7 @@ class BinanceFuturePrivate:
                             "error": "Failed to place order",
                             "details": result
                         })
-                        print(f"Failed to close position for {symbol}")
+                        logger_access.info(f"Failed to close position for {symbol}")
                         
                 except Exception as e:
                     results.append({
@@ -711,7 +711,7 @@ class BinanceFuturePrivate:
                         "error": str(e)
                     })
                     logger_error.error("Error closing position for %s: %s", symbol, e)
-                    print(f"Error closing position for {symbol}: {e}")
+                    logger_error.error(f"Error closing position for {symbol}: {e}")
             
             return {
                 "code": 0,
@@ -723,7 +723,7 @@ class BinanceFuturePrivate:
             
         except Exception as e:
             logger_error.error("Error closing all positions: %s", e)
-            print(f"Error closing all positions: {e}")
+            logger_error.error(f"Error closing all positions: {e}")
             return {
                 "code": -1,
                 "msg": f"Error closing all positions: {str(e)}",

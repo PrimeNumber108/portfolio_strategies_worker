@@ -113,7 +113,6 @@ class BinanceFuturePrivate:
                 - total (float): The total balance.
         """
         result = self.trade.futures_account_balance()
-        # print(result)
         data ={"asset": '',
                     "free": 0,
                     "available": 0,
@@ -123,7 +122,6 @@ class BinanceFuturePrivate:
                     "total": 0}
         for asset in result:
             if asset["asset"] == coin:
-                # print('asset',asset["asset"])
                 data = {
                     "asset": asset["asset"],
                     "free": float(asset["availableBalance"]),
@@ -530,7 +528,6 @@ class BinanceFuturePrivate:
         try:
             # Fetch account position info
             positions = self.trade.futures_position_information()
-            # print(positions)
             # Find the relevant position
             for pos in positions:
                 if pos['symbol'] == symbol:

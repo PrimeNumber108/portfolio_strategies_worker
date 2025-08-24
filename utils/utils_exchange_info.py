@@ -157,12 +157,10 @@ def get_candle_data_info(symbol_redis, exchange_name, r, interval = '1h'):
     """
     now = int(time.time()*1000)
     if r.exists(f'{symbol_redis}_{exchange_name}_candle_{interval}') < 1:
-        print(f'{symbol_redis}_{exchange_name}_candle_{interval} not exist')
         return None
     candles = json.loads(r.get(f'{symbol_redis}_{exchange_name}_candle_{interval}'))
     ts = float(candles['ts'])
     if now - ts >= 3000:
-        print('delay_time_need_get_candle_api_intead')
         return None
     return candles
 
