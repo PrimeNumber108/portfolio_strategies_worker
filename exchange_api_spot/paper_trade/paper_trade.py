@@ -513,7 +513,6 @@ class PaperTrade:
                 }
             
             current_price = float(current_price_data['price'])
-            logger_access.info('current_price:: ',current_price)
             # Determine execution price
             if order_type.upper() == 'MARKET':
                 execution_price = current_price

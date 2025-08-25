@@ -28,7 +28,7 @@ except Exception:
 CURRENT_DIR = os.path.dirname(os.path.abspath(__file__))
 PROJECT_ROOT = os.path.abspath(os.path.join(CURRENT_DIR, "../"))
 sys.path.insert(0, PROJECT_ROOT)
-from logger import logger_error, logger_database
+from logger import logger_error, logger_database, logger_access
 from utils import make_golang_api_call
 
 
@@ -128,6 +128,7 @@ def compute_balance(initial_balance: float, orders: List[Dict[str, Any]]) -> Dic
     balances: Dict[str, Any] = {}
     inventory_value = 0.0
 
+    # Calculate total inventory value but don't show individual positions
     for sym, pos in positions.items():
         qty = float(pos.get("qty") or 0)
         if abs(qty) < 1e-12:
@@ -135,11 +136,12 @@ def compute_balance(initial_balance: float, orders: List[Dict[str, Any]]) -> Dic
         price = last_trade_price.get(sym, 0.0)
         value = qty * price
         inventory_value += value
-        balances[sym] = {"qty": qty, "price": price, "value": value}
+        # Don't add individual positions to balances - only show USDT equivalent
 
-    total = cash + inventory_value
-    balances["Cash"] = round(cash, 8)
-    balances["Total"] = round(total, 8)
+    # Show total USDT equivalent (cash + inventory value)
+    total_usdt_value = cash + inventory_value
+    balances["USDT"] = {"amount": round(total_usdt_value, 8)}
+    balances["Total"] = round(total_usdt_value, 8)
     logger_database.info(f"compute_balance: {balances} ")
     return {
         "success": True,
@@ -154,7 +156,7 @@ def main():
     if not session_key:
         result = {
             "success": True,
-            "balances": {"Cash": 1000.0, "Total": 1000.0},
+            "balances": {"USDT": {"amount": 1000.0}, "Total": 1000.0},
             "warning": "Missing STRATEGY_SESSION_KEY; using defaults",
         }
         print("RESULT: " + json.dumps(result))
@@ -178,7 +180,7 @@ def main():
         result = {
             "success": True,
             "error": str(e),
-            "balances": {"Cash": 0.0, "Total": 0.0},
+            "balances": {"USDT": {"amount": 0.0}, "Total": 0.0},
             "session_key": session_key,
         }
         logger_database.info("run result error")

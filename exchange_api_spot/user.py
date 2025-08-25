@@ -44,8 +44,9 @@ def get_client_exchange(exchange_name = "", acc_info='', symbol='BTC', quote="US
     client = None
     exchange_name = EXCHANGE or exchange_name 
     
-    PAPER_MODE = 'true'
+    # PAPER_MODE = 'true'
     # logger_error.error("PAPER_MODE 2: ",PAPER_MODE)
+    # logger_access.info("PAPER_MODE zz: ",PAPER_MODE)
     try:
         # Check if client already exists in cache
         if acc_info and "api_key" in acc_info and acc_info["api_key"] in clients_dict:
@@ -60,7 +61,7 @@ def get_client_exchange(exchange_name = "", acc_info='', symbol='BTC', quote="US
         
         # Create client based on exchange name
         exchange_name = str(exchange_name).lower()
-        if PAPER_MODE == 'true':
+        if PAPER_MODE == True or PAPER_MODE == 'true':
              # Paper trading - no real money involved
                 initial_balance = acc_info.get('initial_balance', 10000)  # Default $10,000 balance
                 # Use session_key parameter first, then fall back to acc_info
