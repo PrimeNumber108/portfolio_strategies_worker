@@ -198,6 +198,34 @@ class BinancePrivateNew:
         r.set(f'{self.symbol_redis}_binance_ticker', ticker_str)
         return tick_dict
     
+    def get_price(self, base="", quote="USDT"):
+        """
+        Get the latest price for a symbol using Binance Symbol Price Ticker endpoint.
+        
+        Args:
+            base (str, optional): The base currency of the symbol. Defaults to "".
+            quote (str, optional): The quote currency of the symbol. Defaults to "USDT".
+        
+        Returns:
+            dict: A dictionary containing the price information with the following key:
+                - price (str): The latest price for the symbol.
+        
+        Reference:
+            https://developers.binance.com/docs/binance-spot-api-docs/rest-api/market-data-endpoints#symbol-price-ticker
+        """
+        symbol = f'{base}{quote}'
+        if base == "":
+            symbol = self.symbol_ex
+        
+        try:
+            # Use ticker_price method from binance.spot.Spot client
+            # This calls GET /api/v3/ticker/price endpoint
+            price_data = self.client.ticker_price(symbol=symbol.upper())
+            return price_data
+        except Exception as e:
+            logger_error.error(f"Error fetching price for {symbol}: {str(e)}")
+            return {"price": "0"}
+    
     def place_order(self, side_order, quantity, order_type, price ='', force = 'normal', base = "", quote ="USDT"):
         """
         Places an order on the exchange.
