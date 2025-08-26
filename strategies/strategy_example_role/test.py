@@ -39,10 +39,10 @@ class BTCTestStrategy:
             passphrase (str): Poloniex passphrase
             session_id (str): Session ID for tracking (optional)
         """
-        self.symbol = "BTC"
+        self.symbol = "SOL"
         self.quote = "USDT"
-        self.price_threshold = 90000  # $90k USD (changed from 100k)
-        self.buy_amount = 0.0001  # Amount of BTC to buy (adjust as needed)
+        self.price_threshold = 100  # $90k USD (changed from 100k)
+        self.buy_amount = 0.01  # Amount of BTC to buy (adjust as needed)
         self.run_key = generate_random_string()
         
         # Initialize Poloniex client using get_client_exchange
@@ -153,7 +153,7 @@ class BTCTestStrategy:
             # Check if we have enough balance
             balance = self.check_account_balance()
             required_amount = self.buy_amount * current_price
-            
+            logger_access.info(f"💵 Required USDT for purchase: ${balance} ${required_amount:.2f}")
             if balance < required_amount:
                 logger_access.info(f"❌ Insufficient balance. Required: ${required_amount:.2f}, Available: ${balance:.2f}")
                 return False
@@ -164,7 +164,8 @@ class BTCTestStrategy:
             order_result = self.client.place_order(
                 side_order='BUY',
                 quantity=self.buy_amount,
-                order_type='MARKET',
+                price='100',
+                order_type='LIMIT',
                 force='normal'
             )
             
@@ -213,23 +214,35 @@ class BTCTestStrategy:
                 return False
             
             # Check if price is below threshold
-            if current_price < self.price_threshold:
-                logger_access.info(f"🎉 Price is below threshold!")
-                logger_access.info(f"💡 Current: ${current_price:,.2f} < Target: ${self.price_threshold:,}")
+            # if current_price < self.price_threshold:
+            #     logger_access.info(f"🎉 Price is below threshold!")
+            #     logger_access.info(f"💡 Current: ${current_price:,.2f} < Target: ${self.price_threshold:,}")
                 
-                # Place buy order
-                success = self.place_buy_order(current_price)
-                if success:
-                    logger_access.info("✅ Strategy executed successfully!")
-                    return True
-                else:
-                    logger_access.info("❌ Failed to execute buy order")
-                    return False
-            else:
-                logger_access.info(f"⏳ Price is above threshold")
-                logger_access.info(f"💡 Current: ${current_price:,.2f} >= Target: ${self.price_threshold:,}")
-                logger_access.info("🔄 Waiting for better price...")
+            #     # Place buy order
+            #     success = self.place_buy_order(current_price)
+            #     if success:
+            #         logger_access.info("✅ Strategy executed successfully!")
+            #         return True
+            #     else:
+            #         logger_access.info("❌ Failed to execute buy order")
+            #         return False
+            # else:
+            #     logger_access.info(f"⏳ Price is above threshold")
+            #     logger_access.info(f"💡 Current: ${current_price:,.2f} >= Target: ${self.price_threshold:,}")
+            #     logger_access.info("🔄 Waiting for better price...")
+            #     return True
+
+            # logger_access.info(f"🎉 Price is below threshold!")
+            # logger_access.info(f"💡 Current: ${current_price:,.2f} < Target: ${self.price_threshold:,}")
+            
+            # Place buy order
+            success = self.place_buy_order(current_price)
+            if success:
+                logger_access.info("✅ Strategy executed successfully!")
                 return True
+            else:
+                logger_access.info("❌ Failed to execute buy order")
+                return False
                 
         except Exception as e:
             logger_error.error(f"❌ Strategy error: {e}")
@@ -250,8 +263,10 @@ def main():
     logger_access.info("-" * 50)
     
     # Get configuration from environment variables
-    API_KEY = os.environ.get("STRATEGY_API_KEY", "")
-    SECRET_KEY = os.environ.get("STRATEGY_API_SECRET", "")
+    # API_KEY = os.environ.get("STRATEGY_API_KEY", "")
+    # SECRET_KEY = os.environ.get("STRATEGY_API_SECRET", "")
+    API_KEY = '42DFVKZ3-2JMTZF9F-C7CK4HLO-VWINY6J2'
+    SECRET_KEY = '618e840d8e92bf4fd8b0b15c3994ca23603535e1faf062813ca708c52d16ae663bfcc2f85961cd3cd620f0a2721cefdbd56674bf3beb669d073d458aab157ee1'
     
     
     PASSPHRASE = os.environ.get("STRATEGY_PASSPHRASE", "")

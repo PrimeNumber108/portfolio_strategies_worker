@@ -43,6 +43,7 @@ def get_client_exchange(exchange_name = "", acc_info='', symbol='BTC', quote="US
     """
     client = None
     exchange_name = EXCHANGE or exchange_name 
+    logger_access.info(f"\n🔑 Getting client for exchange: {exchange_name}, symbol: {symbol}, quote: {quote}, PAPER_MODE: {PAPER_MODE}")
     
     # PAPER_MODE = 'true'
     # logger_error.error("PAPER_MODE 2: ",PAPER_MODE)
@@ -125,6 +126,7 @@ def _get_client_exchange(exchange_name = "", acc_info='', symbol='BTC', quote="U
         )
         
     elif exchange_name == 'poloniex':
+        logger_access.info("Creating Poloniex client...")
         client = PoloniexPrivate(
             symbol=symbol, 
             quote=quote, 
