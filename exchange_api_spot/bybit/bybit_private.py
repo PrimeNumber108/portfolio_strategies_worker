@@ -4,19 +4,23 @@ import os
 import json
 import math
 import redis
+import uuid
 from pybit.unified_trading import HTTP
-from logger import logger_bybit, logger_error, logger_access
-from utils import calculate_gap_hours,get_candle_data_info,convert_order_status, ORDER_PARTIALLY_FILLED
+from logger import logger_bybit, logger_error, logger_access, logger_database
+from utils import calculate_gap_hours, get_candle_data_info, convert_order_status, ORDER_PARTIALLY_FILLED, make_golang_api_call
 sys.path.append(os.getcwd())
 
 FEE_PERCENT = 0.1/100
 r = redis.Redis(host='localhost', port=6379, decode_responses=True)
 
+# Golang API configuration
+GOLANG_API_BASE_URL = "http://localhost:8083"
+
 class BybitPrivate:
     """
     BybitPrivate
     """
-    def __init__ (self, symbol, quote = 'USDT', api_key ='', secret_key ='', passphrase ='', instype= 'spot'):
+    def __init__ (self, symbol, quote = 'USDT', api_key ='', secret_key ='', passphrase ='', instype= 'spot', session_key=''):
         """
         Initializes a new instance of the BybitPrivate class.
 
@@ -43,6 +47,7 @@ class BybitPrivate:
         self.client = HTTP(api_key=api_key,api_secret=secret_key,testnet = False)
         self.passphrase = passphrase
         self.instype = instype
+        self.session_key = session_key or str(uuid.uuid4())  # Generate unique session key if not provided
         scale_redis = r.get(f'{self.symbol_redis}_bybit_scale')
         if scale_redis is not None:
             scale = json.loads(scale_redis)
@@ -285,6 +290,23 @@ class BybitPrivate:
                 price = str(self.client.get_tickers(category="spot",symbol=symbol)["result"]["list"][0]['lastPrice'])
             if force == "normal":
                 force = "GTC"
+            
+            # Prepare order data for Golang API storage
+            order_data = {
+                "symbol": symbol,
+                "side": side_order,
+                "type": order_type.capitalize(),
+                "quantity": str(quantity),
+                "timeInForce": force
+            }
+            if price:
+                order_data["price"] = str(price)
+            
+            # Store order in Golang API first (pending status)
+            golang_stored = self.store_order_in_golang_api(order_data, status="pending")
+            if not golang_stored:
+                logger_access.info("⚠️ Failed to store order in Golang API, continuing with exchange order")
+                
             kwargs ={
                 "category":self.instype,
                 "symbol":symbol,
@@ -297,8 +319,30 @@ class BybitPrivate:
             if order_type.lower() == 'market' and side_order.lower() == 'buy':
                 kwargs['qty'] = round(float(quantity)*float(price), int(self.qty_scale))
             re_place = self.client.place_order(**kwargs)
+            
             if re_place['retMsg'] == 'OK' or re_place['retCode'] == 0:
+                # Update Golang API with exchange order ID and status
+                if 'result' in re_place and 'orderId' in re_place['result']:
+                    exchange_order_id = str(re_place['result']['orderId'])
+                    status = "filled" if re_place['result'].get('orderStatus') == 'Filled' else "pending"
+                    
+                    # Store/update order with exchange order ID
+                    if golang_stored:
+                        order_data["exchange_order_id"] = exchange_order_id
+                        self.store_order_in_golang_api(order_data, exchange_order_id, status)
+                    else:
+                        self.store_order_in_golang_api(order_data, exchange_order_id, status)
+                    
+                    logger_access.info(f"✅ Bybit order placed successfully: {exchange_order_id}")
+                
                 return {"code": 0, "data": re_place['result']}
+            else:
+                # Order failed, update Golang API if we stored it
+                if golang_stored:
+                    logger_access.info("❌ Bybit order failed, should update Golang API status to rejected")
+                
+                logger_access.info(f"❌ Bybit order failed: {re_place}")
+                
         except Exception as e:
             logger_error.error(f"{e} {e.__traceback__.tb_lineno}")
         return  False #result
@@ -868,4 +912,91 @@ class BybitPrivate:
         result["candle"] = result["candle"][-tick_number:]
         logger_bybit.warning(f'reuslt candle {result["candle"]}')
         return {'data':result['candle']}
+    
+    def store_order_in_golang_api(self, order_data, exchange_order_id=None, status="pending"):
+        """Store order data in Golang API using the new authentication utility"""
+        try:
+            # Prepare order data for Golang API
+            golang_order_data = {
+                "session_key": self.session_key,
+                "symbol": order_data.get("symbol", self.symbol_ex),
+                "side": order_data.get("side", "").lower(),
+                "order_type": order_data.get("type", "market").lower(),
+                "quantity": float(order_data.get("quantity", 0)),
+                "price": float(order_data.get("price", 0)) if order_data.get("price") else 0,
+                "time_in_force": order_data.get("timeInForce", "GTC"),
+                "status": status,
+            }
+            
+            # Add exchange order ID if provided
+            if exchange_order_id:
+                golang_order_data["exchange_order_id"] = exchange_order_id
+            
+            # Use the new authentication utility to make the API call
+            logger_access.info(f"📝 Creating order in Golang API: {golang_order_data}")
+            response = make_golang_api_call(
+                method="POST",
+                endpoint="/api/v1/orders/orders",
+                data=golang_order_data,
+                base_url=GOLANG_API_BASE_URL
+            )
+            
+            if response and response.get("success"):
+                order_id = response.get("order", {}).get("order_id")
+                logger_access.info(f"✅ Order stored in Golang API with ID: {order_id}")
+                
+                # If we have exchange order ID, update the order
+                if exchange_order_id:
+                    self.update_order_in_golang_api(order_id, exchange_order_id, status)
+                
+                return True
+            else:
+                error_msg = response.get("error", "Unknown error") if response else "No response"
+                logger_access.info(f"❌ Failed to store order in Golang API: {error_msg}")
+                return False
+                
+        except Exception as e:
+            logger_error.error(f"❌ Error storing order in Golang API: {str(e)}")
+            return False
+    
+    def update_order_in_golang_api(self, order_id, exchange_order_id=None, status="pending", filled_qty=0, avg_price=0):
+        """Update order status in Golang API using the new authentication utility"""
+        try:
+            # Validate status
+            valid_statuses = ["pending", "filled", "canceled", "rejected", "partially_filled"]
+            if status not in valid_statuses:
+                logger_access.info(f"❌ Invalid status '{status}'. Must be one of: {valid_statuses}")
+                return False
+            
+            update_data = {
+                "status": status
+            }
+            
+            if exchange_order_id:
+                update_data["exchange_order_id"] = exchange_order_id
+            if filled_qty > 0:
+                update_data["filled_qty"] = filled_qty
+            if avg_price > 0:
+                update_data["avg_price"] = avg_price
+            
+            # Use the new authentication utility to make the API call
+            logger_access.info(f"🔄 Updating order {order_id} with data: {update_data}")
+            response = make_golang_api_call(
+                method="PUT",
+                endpoint=f"/api/v1/orders/{order_id}/status",
+                data=update_data,
+                base_url=GOLANG_API_BASE_URL
+            )
+            
+            if response and response.get("success"):
+                logger_access.info(f"✅ Order {order_id} updated in Golang API")
+                return True
+            else:
+                error_msg = response.get("error", "Unknown error") if response else "No response"
+                logger_access.info(f"❌ Failed to update order in Golang API: {error_msg}")
+                return False
+                
+        except Exception as e:
+            logger_error.error(f"❌ Error updating order in Golang API: {str(e)}")
+            return False
 
