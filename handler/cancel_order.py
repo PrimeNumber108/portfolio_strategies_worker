@@ -16,6 +16,7 @@ from exchange_api_spot.user import get_client_exchange
 from exchange_api_future.user import get_client_exchange as get_future_client_exchange
 from logger import logger_database, logger_error, logger_access
 from typing import Dict, Any, Optional, List
+from utils import get_arg
 
 
 def cancel_spot_orders(session_key: str, api_key: str, secret_key: str, exchange_name: str, 
@@ -53,7 +54,6 @@ def cancel_spot_orders(session_key: str, api_key: str, secret_key: str, exchange
             symbol=symbol,
             quote=quote,
             session_key=session_key,
-            paper_mode=False
         )
         
         if not client:
@@ -185,7 +185,6 @@ def cancel_future_orders(session_key: str, api_key: str, secret_key: str, exchan
             symbol=symbol,
             quote=quote,
             session_key=session_key,
-            paper_mode=False
         )
         
         if not client:
@@ -327,18 +326,21 @@ if __name__ == "__main__":
     # Test the functions
     logger_access.info("🧪 Testing cancel_order.py")
     
-    # Example usage
-    test_session_key = "test_session_123"
-    test_api_key = "test_api_key"
-    test_secret_key = "test_secret_key"
-    test_exchange = "binance"
+
+    SESSION_ID     = get_arg(1, '')
+    EXCHANGE       = get_arg(2, '')
+    API_KEY        = get_arg(3, '')
+    SECRET_KEY     = get_arg(4, '')
+    STRATEGY_NAME  = get_arg(5, '')
+    PASSPHRASE     = get_arg(6, '')
+    ASSET_FILTER   = ''
     
     # Test spot order cancellation
     result = cancel_orders(
-        session_key=test_session_key,
-        api_key=test_api_key,
-        secret_key=test_secret_key,
-        exchange_name=test_exchange,
+        session_key=SESSION_ID,
+        api_key=API_KEY,
+        secret_key=SECRET_KEY,
+        exchange_name=EXCHANGE,
         trading_type="spot"
     )
     

@@ -21,12 +21,14 @@ from exchange_api_spot.paper_trade.paper_trade import PaperTrade
 # Import user constants
 from utils.user_constants import EXCHANGE, PAPER_MODE
 from logger import logger_database, logger_error, logger_access
+from constants import get_constants
+
 
 clients_dict = {}
+params = get_constants()
+PAPER_MODE = params.get("PAPER_MODE", False)
 
-PAPER_MODE = PAPER_MODE if PAPER_MODE else False
-
-def get_client_exchange(exchange_name = "", acc_info='', symbol='BTC', quote="USDT", session_key="", paper_mode=False):
+def get_client_exchange(exchange_name = "", acc_info='', symbol='BTC', quote="USDT", session_key=""):
     """
     Creates and returns a client object for the specified exchange.
     
@@ -42,11 +44,9 @@ def get_client_exchange(exchange_name = "", acc_info='', symbol='BTC', quote="US
         Exchange client instance or None if exchange not supported
     """
     client = None
+    EXCHANGE = params["EXCHANGE"]
     exchange_name = EXCHANGE or exchange_name 
     
-    # PAPER_MODE = 'true'
-    # logger_error.error("PAPER_MODE 2: ",PAPER_MODE)
-    # logger_access.info("PAPER_MODE zz: ",PAPER_MODE)
     try:
         # Check if client already exists in cache
         if acc_info and "api_key" in acc_info and acc_info["api_key"] in clients_dict:

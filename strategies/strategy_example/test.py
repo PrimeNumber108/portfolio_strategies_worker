@@ -20,12 +20,14 @@ PROJECT_ROOT = os.path.abspath(os.path.join(CURRENT_DIR, "../../"))
 sys.path.insert(0, PROJECT_ROOT)
 
 from logger import logger_database, logger_error, logger_access
+from constants import set_constants, get_constants
 from exchange_api_spot.user import get_client_exchange
 from utils import (
     get_line_number,
     update_key_and_insert_error_log,
     generate_random_string,
-    get_precision_from_real_number
+    get_precision_from_real_number,
+    get_arg
 )
 
 
@@ -43,7 +45,7 @@ class BTCTestStrategy:
         self.symbol = "BTC"
         self.quote = "USDT"
         self.price_threshold = 90000  # $90k USD (changed from 100k)
-        self.buy_amount = 0.0001  # Amount of BTC to buy (adjust as needed)
+        self.buy_amount = 0.0005  # Amount of BTC to buy (adjust as needed)
         self.run_key = generate_random_string()
         self.session_key = session_key
         
@@ -61,8 +63,8 @@ class BTCTestStrategy:
                 symbol=self.symbol,
                 quote=self.quote,
                 session_key=session_key,  # Pass session_key to get_client_exchange
-                paper_mode=False  # Disable proxy to avoid connection issues
             )
+
             logger_access.info(f"✅ Poloniex client initialized successfully for {self.symbol}/{self.quote}")
             logger_database.info(f"BTC test strategy initialized for {self.symbol}/{self.quote}")
         except Exception as e:
@@ -154,9 +156,9 @@ class BTCTestStrategy:
         """
         try:
             # Check if we have enough balance
-            balance = self.check_account_balance()
+            # balance = self.check_account_balance()
             required_amount = self.buy_amount * current_price
-            
+            logger_access.info("required_amount: ",required_amount)
             # if balance < required_amount:
             #     logger_access.info(f"❌ Insufficient balance. Required: ${required_amount:.2f}, Available: ${balance:.2f}")
             #     return False
@@ -210,7 +212,7 @@ class BTCTestStrategy:
         try:
             # Get current price
             current_price = self.get_current_price()
-            
+            logger_access.info(f"Current price: {current_price}")
             if current_price is None:
                 logger_access.info("❌ Cannot proceed without price data")
                 return False
@@ -254,27 +256,30 @@ def main():
     """
     logger_access.info("🚀 Running BTC Test Strategy...")
     logger_access.info("-" * 50)
+
+
+    params = get_constants()
+    SESSION_ID     = params.get("SESSION_ID", "")
+    EXCHANGE       = params.get("EXCHANGE", "")
+    API_KEY        = params.get("API_KEY", "")
+    SECRET_KEY     = params.get("SECRET_KEY", "")
+    PASSPHRASE     = params.get("PASSPHRASE", "")
+    STRATEGY_NAME  = params.get("STRATEGY_NAME", "")
+    PAPER_MODE     = params.get("PAPER_MODE", True)     
     
-    # Get configuration from environment variables
-    API_KEY = os.environ.get("STRATEGY_API_KEY", "asdqwqw")
-    SECRET_KEY = os.environ.get("STRATEGY_API_SECRET", "qwdwqwdqw")
-    PASSPHRASE = os.environ.get("STRATEGY_PASSPHRASE", "qwaaaa")
-    SESSION_KEY = os.environ.get("STRATEGY_SESSION_KEY", "sssaaa")
+    logger_access.info(f"Parameters: {params}")
+   
 
     if not API_KEY or not SECRET_KEY:
-        logger_access.info("❌ Please set your Poloniex API credentials in environment variables:")
-        logger_access.info("   STRATEGY_API_KEY")
-        logger_access.info("   STRATEGY_API_SECRET") 
-        logger_access.info("   STRATEGY_PASSPHRASE (optional)")
-        logger_access.info("   STRATEGY_SESSION_KEY (required)")
+        logger_access.info("❌ API credentials are required")
         return
     
-    if not SESSION_KEY:
-        logger_access.info("❌ Please set STRATEGY_SESSION_KEY environment variable")
+    if not SESSION_ID:
+        logger_access.info("❌ Session key is required")
         return
     
     logger_access.info("✅ Environment variables loaded successfully")
-    logger_access.info(f"🔑 Session Key: {SESSION_KEY}")
+    logger_access.info(f"🔑 Session Key: {SESSION_ID}")
     logger_database.info("BTC Test Strategy starting...")
 
     try:
@@ -283,10 +288,10 @@ def main():
             api_key=API_KEY,
             secret_key=SECRET_KEY,
             passphrase=PASSPHRASE,
-            session_key=SESSION_KEY,
+            session_key=SESSION_ID,
         )
-        balance = strategy.get_account_balance()
-        logger_access.info(f"💰 Account Balance: {balance}")
+        # balance = strategy.get_account_balance()
+        # logger_access.info(f"💰 Account Balance: {balance}")
         logger_access.info(f"🎯 Strategy initialized - Target price: ${strategy.price_threshold:,}")
         logger_access.info("BTC Test Strategy initialized successfully")
 

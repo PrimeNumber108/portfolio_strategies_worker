@@ -16,6 +16,7 @@ from exchange_api_future.user import get_client_exchange as get_future_client_ex
 from logger import logger_database, logger_error, logger_access
 from typing import Dict, Any, Optional, List
 import time
+from utils import get_arg
 
 
 def get_open_positions(client, exchange_name: str) -> List[Dict[str, Any]]:
@@ -181,7 +182,6 @@ def close_all_futures_positions(session_key: str, api_key: str, secret_key: str,
             symbol=symbol,
             quote=quote,
             session_key=session_key,
-            paper_mode=False
         )
         
         if not client:
@@ -325,18 +325,21 @@ if __name__ == "__main__":
     # Test the functions
     logger_access.info("🧪 Testing closs_position.py")
     
-    # Example usage
-    test_session_key = "test_session_123"
-    test_api_key = "test_api_key"
-    test_secret_key = "test_secret_key"
-    test_exchange = "binance"
+
+    SESSION_ID     = get_arg(1, '')
+    EXCHANGE       = get_arg(2, '')
+    API_KEY        = get_arg(3, '')
+    SECRET_KEY     = get_arg(4, '')
+    STRATEGY_NAME  = get_arg(5, '')
+    PASSPHRASE     = get_arg(6, '')
+    ASSET_FILTER   = ''
     
     # Test futures position closing
     result = close_all_futures_positions(
-        session_key=test_session_key,
-        api_key=test_api_key,
-        secret_key=test_secret_key,
-        exchange_name=test_exchange
+        session_key=SESSION_ID,
+        api_key=API_KEY,
+        secret_key=SECRET_KEY,
+        exchange_name=EXCHANGE
     )
     
     logger_access.info(f"📊 Test result: {result}")

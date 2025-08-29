@@ -19,14 +19,14 @@ from exchange_api_spot.poloniex.poloniex_private import PoloniexPrivate
 from exchange_api_spot.paper_trade.paper_trade import PaperTrade
 
 # Import user constants
-from utils.user_constants import EXCHANGE, PAPER_MODE
 from logger import logger_database, logger_error, logger_access
+from constants import get_constants
 
 clients_dict = {}
+params = get_constants()
+PAPER_MODE = params.get("PAPER_MODE", False)
 
-PAPER_MODE = PAPER_MODE if PAPER_MODE else False
-
-def get_client_exchange(exchange_name = "", acc_info='', symbol='BTC', quote="USDT", session_key="", paper_mode=False):
+def get_client_exchange(exchange_name = "", acc_info='', symbol='BTC', quote="USDT", session_key=""):
     """
     Creates and returns a client object for the specified exchange.
     
@@ -42,6 +42,8 @@ def get_client_exchange(exchange_name = "", acc_info='', symbol='BTC', quote="US
         Exchange client instance or None if exchange not supported
     """
     client = None
+    # PAPER_MODE = False
+    EXCHANGE = params["EXCHANGE"]
     exchange_name = EXCHANGE or exchange_name 
     logger_access.info(f"\n🔑 Getting client for exchange: {exchange_name}, symbol: {symbol}, quote: {quote}, PAPER_MODE: {PAPER_MODE}")
     

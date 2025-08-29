@@ -15,6 +15,7 @@ sys.path.insert(0, PROJECT_ROOT)
 
 from sell_spot import close_spot_positions_and_sell
 from logger import logger_access, logger_error
+from utils import get_arg
 
 
 def main():
@@ -23,23 +24,24 @@ def main():
     Expects command line arguments: session_key, exchange, api_key, api_secret
     """
     try:
-        # Get arguments from command line
-        if len(sys.argv) < 5:
-            raise ValueError("Missing required arguments: session_key, exchange, api_key, api_secret")
+
+        SESSION_ID     = get_arg(1, '')
+        EXCHANGE       = get_arg(2, '')
+        API_KEY        = get_arg(3, '')
+        SECRET_KEY     = get_arg(4, '')
+        STRATEGY_NAME  = get_arg(5, '')
+        PASSPHRASE     = get_arg(6, '')
+        ASSET_FILTER   = ''
         
-        session_key = sys.argv[1]
-        exchange = sys.argv[2]
-        api_key = sys.argv[3]
-        api_secret = sys.argv[4]
         
-        logger_access.info(f"🔄 Starting spot position closure and asset selling for session: {session_key}")
+        logger_access.info(f"🔄 Starting spot position closure and asset selling for session: {SESSION_ID}")
         
         # Call the close spot positions and sell function
         result = close_spot_positions_and_sell(
-            session_key=session_key,
-            api_key=api_key,
-            secret_key=api_secret,
-            exchange_name=exchange
+            session_key=SESSION_ID,
+            api_key=API_KEY,
+            secret_key=SECRET_KEY,
+            exchange_name=EXCHANGE
         )
         
         # Output result as JSON

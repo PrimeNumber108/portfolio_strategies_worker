@@ -19,12 +19,8 @@ try:
 except Exception:
     get_client_exchange = None
 
-
-def env(name: str, default: str = "") -> str:
-    v = os.environ.get(name)
-    return v if v is not None else default
-
-
+def get_arg(index, default=''):
+    return sys.argv[index] if len(sys.argv) > index else default
 def fetch_balances(client):
     """Return formatted balances dict with top-level Total."""
     if client is None:
@@ -70,9 +66,18 @@ def fetch_balances(client):
 
 
 def main():
-    api_key = env("STRATEGY_API_KEY")
-    api_secret = env("STRATEGY_API_SECRET")
-    passphrase = env("STRATEGY_PASSPHRASE")
+    """
+    Main function to run the balance checker
+    Expects command line arguments: session_key, exchange, api_key, api_secret, strategy_name, [passphrase]
+    """
+
+    SESSION_ID     = get_arg(1, '')
+    EXCHANGE       = get_arg(2, '')
+    API_KEY        = get_arg(3, '')
+    SECRET_KEY     = get_arg(4, '')
+    STRATEGY_NAME  = get_arg(5, '')
+    PASSPHRASE     = get_arg(6, '')
+    ASSET_FILTER   = ''
 
     client = None
     if get_client_exchange is not None:
@@ -80,9 +85,9 @@ def main():
             client = get_client_exchange(
                 exchange_name="bitget",
                 acc_info={
-                    "api_key": api_key,
-                    "secret_key": api_secret,
-                    "passphrase": passphrase,
+                    "api_key": API_KEY,
+                    "secret_key": SECRET_KEY,
+                    "passphrase": PASSPHRASE,
                 },
                 symbol="BTC",
                 quote="USDT",

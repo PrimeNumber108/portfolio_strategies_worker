@@ -12,7 +12,6 @@ import traceback
 from pathlib import Path
 from logger import logger_access, logger_error
 from utils import get_arg
-from constants import set_constants, get_constants
 
 def configure_matplotlib_for_notebook():
     """Configure matplotlib for notebook execution (plots will be embedded in notebook)"""
@@ -216,10 +215,20 @@ def execute_strategy_file(script_path, config):
         if strategy_dir not in sys.path:
             sys.path.insert(0, strategy_dir)
         
-        ## set argv
-        args = sys.argv[1:]
-        set_constants(args)
-        logger_access.info(f"Parameters: {args}")
+        # Wire parameters via command-line args so strategy scripts can read them with get_arg
+        old_argv = sys.argv[:]
+        sys.argv = [
+            str(script_path),
+            config.get('session_key', ''),     # arg1: SESSION_ID
+            config.get('exchange', ''),        # arg2: EXCHANGE
+            config.get('api_key', ''),         # arg3: API_KEY
+            config.get('api_secret', ''),      # arg4: SECRET_KEY
+            config.get('strategy_name', ''),   # arg5: STRATEGY_NAME (optional)
+            config.get('passphrase', ''),      # arg6: PASSPHRASE (optional)
+            config.get('asset_filter', ''),    # arg7: ASSET_FILTER (optional)
+            ('true' if config.get('paper_trading', False) else 'false'),  # arg8: PAPER_TRADING
+            ('paper' if config.get('paper_trading', False) else ''),       # arg9: TRADING_MODE
+        ]
 
         if config.get('paper_trading', False):
             logger_access.info("📝 Paper trading mode enabled")
@@ -227,10 +236,9 @@ def execute_strategy_file(script_path, config):
         # Execute the module
         try:
             spec.loader.exec_module(strategy_module)
-        except Exception as e:
-            logger_access.error(f"❌ Failed to load strategy module: {e}")
-            logger_access.error(f"📋 Traceback:\n{traceback.format_exc()}")
-
+        finally:
+            sys.argv = old_argv
+        
         # Look for main function or strategy class
         if hasattr(strategy_module, 'main'):
             logger_access.info("📞 Calling main() function...")

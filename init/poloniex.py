@@ -15,7 +15,7 @@ CURRENT_DIR = os.path.dirname(os.path.abspath(__file__))
 PROJECT_ROOT = os.path.abspath(os.path.join(CURRENT_DIR, "../"))
 sys.path.insert(0, PROJECT_ROOT)
 
-from logger import logger_database, logger_error
+from logger import logger_database, logger_error, logger_access
 from exchange_api_spot.user import get_client_exchange
 from utils import (
     get_line_number,
@@ -308,26 +308,56 @@ class PoloniexBalanceChecker:
             return {
                 "Total": 0.0
             }
-
+def get_arg(index, default=''):
+    return sys.argv[index] if len(sys.argv) > index else default
 def main():
     """
     Main function to run the balance checker
+    Expects command line arguments: session_key, exchange, api_key, api_secret, strategy_name, [passphrase]
     """
     print("🔍 Running Poloniex Balance Checker...")
     
-    API_KEY = os.environ.get('STRATEGY_API_KEY', '')
-    SECRET_KEY = os.environ.get('STRATEGY_API_SECRET', '')
+    # Get arguments from command line
+    # if len(sys.argv) < 6:
+    #     print("❌ Missing required arguments: session_key, exchange, api_key, api_secret, strategy_name")
+    #     error_result = {
+    #         "Total": 0.0
+    #     }
+    #     print("RESULT:")
+    #     print(json.dumps(error_result))
+    #     return
     
-    PASSPHRASE = os.environ.get('STRATEGY_PASSPHRASE', '')
-    SESSION_ID = os.environ.get('STRATEGY_SESSION_KEY', '')
-    ASSET_FILTER = os.environ.get('STRATEGY_ASSET_FILTER', '')
-
+    # SESSION_ID = sys.argv[1] or ''
+    # EXCHANGE = sys.argv[2] or ''
+    # API_KEY = sys.argv[3]
+    # SECRET_KEY = sys.argv[4]
+   
+    # STRATEGY_NAME = sys.argv[5] or ''
+    # PASSPHRASE = sys.argv[6] if len(sys.argv) > 6 else ''
+    # ASSET_FILTER = ''
+    SESSION_ID     = get_arg(1, '')
+    EXCHANGE       = get_arg(2, '')
+    API_KEY        = get_arg(3, '')
+    SECRET_KEY     = get_arg(4, '')
+    STRATEGY_NAME  = get_arg(5, '')
+    PASSPHRASE     = get_arg(6, '')
+    ASSET_FILTER   = ''
+    
+    logger_access.info("🔍 Running Poloniex Balance Checker...")
+    logger_access.info(f" Session ID: {SESSION_ID}")
+    logger_access.info(f" Exchange: {EXCHANGE}")
+    logger_access.info(f" Strategy: {STRATEGY_NAME}")     
+    logger_access.info(f" Asset Filter: {ASSET_FILTER if ASSET_FILTER else 'All assets'}")
+    logger_access.info(f" Api key:  {API_KEY}")
+    logger_access.info(f" Secret key: {SECRET_KEY}")
     if not API_KEY or not SECRET_KEY:
         error_result = {
             "Total": 0.0
         }
        
+        logger_access.info("No have api key or secret key")
         
+
         # Output JSON for Golang to parse
         print("\n" + "="*50)
         print("RESULT:")

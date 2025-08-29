@@ -24,8 +24,11 @@ from utils import (
     get_line_number,
     update_key_and_insert_error_log,
     generate_random_string,
-    get_precision_from_real_number
+    get_precision_from_real_number,
+    get_arg
 )
+from constants import set_constants, get_constants
+
 
 
 class BTCTestStrategy:
@@ -58,7 +61,6 @@ class BTCTestStrategy:
                 acc_info=account_info,
                 symbol=self.symbol,
                 quote=self.quote,
-                paper_mode=False  # Disable proxy to avoid connection issues
             )
             logger_access.info(f"✅ Poloniex client initialized successfully for {self.symbol}/{self.quote}")
             logger_database.info(f"BTC test strategy initialized for {self.symbol}/{self.quote}")
@@ -261,16 +263,23 @@ def main():
     """
     logger_access.info("🚀 Running BTC Test Strategy...")
     logger_access.info("-" * 50)
-    
-    # Get configuration from environment variables
-    # API_KEY = os.environ.get("STRATEGY_API_KEY", "")
-    # SECRET_KEY = os.environ.get("STRATEGY_API_SECRET", "")
-    API_KEY = '42DFVKZ3-2JMTZF9F-C7CK4HLO-VWINY6J2'
-    SECRET_KEY = '618e840d8e92bf4fd8b0b15c3994ca23603535e1faf062813ca708c52d16ae663bfcc2f85961cd3cd620f0a2721cefdbd56674bf3beb669d073d458aab157ee1'
-    
-    
-    PASSPHRASE = os.environ.get("STRATEGY_PASSPHRASE", "")
+   
 
+    params = get_constants()
+    SESSION_ID     = params.get("SESSION_ID", "")
+    EXCHANGE       = params.get("EXCHANGE", "")
+    API_KEY        = params.get("API_KEY", "")
+    SECRET_KEY     = params.get("SECRET_KEY", "")
+    PASSPHRASE     = params.get("PASSPHRASE", "")
+    STRATEGY_NAME  = params.get("STRATEGY_NAME", "")
+    PAPER_MODE     = params.get("PAPER_MODE", True)     
+    
+    logger_access.info(f"Parameters 2: {params}")
+
+    logger_access.info(f"🔄 Starting spot order cancellation for session: {SESSION_ID}")
+    logger_access.info(f"🔄 Starting spot order cancellation for exchange: {EXCHANGE}")
+    logger_access.info(f"🔄 Starting spot order cancellation for api_key: {API_KEY}")
+    logger_access.info(f"🔄 Starting spot order cancellation for api_secret: {SECRET_KEY}")
 
     if not API_KEY or not SECRET_KEY:
         logger_access.info("❌ Please set your Poloniex API credentials in environment variables:")

@@ -16,7 +16,7 @@ CURRENT_DIR = os.path.dirname(os.path.abspath(__file__))
 PROJECT_ROOT = os.path.abspath(os.path.join(CURRENT_DIR, "../"))
 sys.path.insert(0, PROJECT_ROOT)
 
-from logger import logger_database, logger_error
+from logger import logger_database, logger_error, logger_access
 from exchange_api_spot.user import get_client_exchange
 from utils import (
     get_line_number,
@@ -329,20 +329,26 @@ class PoloniexBalanceChecker:
                 "total_assets": 0,
                 "total_value_usd": 0.0
             }
-
+def get_arg(index, default=''):
+    return sys.argv[index] if len(sys.argv) > index else default
 def main():
     """
     Main function to run the balance checker
+    Expects command line arguments: session_key, exchange, api_key, api_secret, strategy_name, [passphrase]
     """
     print("🔍 Running Poloniex Balance Checker...")
     
-    # Get API credentials from environment variables
-    API_KEY = os.environ.get('STRATEGY_API_KEY', '')
-    SECRET_KEY = os.environ.get('STRATEGY_API_SECRET', '')
-    PASSPHRASE = os.environ.get('STRATEGY_PASSPHRASE', '')
-    SESSION_ID = os.environ.get('STRATEGY_SESSION_KEY', '')
-    ASSET_FILTER = os.environ.get('STRATEGY_ASSET_FILTER', '')
 
+    SESSION_ID     = get_arg(1, '')
+    EXCHANGE       = get_arg(2, '')
+    API_KEY        = get_arg(3, '')
+    SECRET_KEY     = get_arg(4, '')
+    STRATEGY_NAME  = get_arg(5, '')
+    PASSPHRASE     = get_arg(6, '')
+    ASSET_FILTER   = ''
+
+    logger_access.info(f" API_KEY z: {API_KEY}")
+    logger_access.info(f" SECRET_KEY z: {SECRET_KEY}")
     if not API_KEY or not SECRET_KEY:
         error_result = {
             "success": False,

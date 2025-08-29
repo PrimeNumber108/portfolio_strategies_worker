@@ -19,11 +19,6 @@ except Exception:
     get_client_exchange = None
 
 
-def env(name: str, default: str = "") -> str:
-    v = os.environ.get(name)
-    return v if v is not None else default
-
-
 def fetch_balances(client):
     if client is None:
         return {"Total": 0.0}
@@ -64,12 +59,21 @@ def fetch_balances(client):
     formatted["Total"] = total_usd
     return formatted
 
-
+def get_arg(index, default=''):
+    return sys.argv[index] if len(sys.argv) > index else default
 def main():
-    api_key = env("STRATEGY_API_KEY")
-    api_secret = env("STRATEGY_API_SECRET")
-    passphrase = env("STRATEGY_PASSPHRASE")
-    session_key = env("STRATEGY_SESSION_KEY")
+    """
+    Main function to run the balance checker
+    Expects command line arguments: session_key, exchange, api_key, api_secret, strategy_name, [passphrase]
+    """
+
+    SESSION_ID     = get_arg(1, '')
+    EXCHANGE       = get_arg(2, '')
+    API_KEY        = get_arg(3, '')
+    SECRET_KEY     = get_arg(4, '')
+    STRATEGY_NAME  = get_arg(5, '')
+    PASSPHRASE     = get_arg(6, '')
+    ASSET_FILTER   = ''
 
     # Build client
     client = None
@@ -78,9 +82,9 @@ def main():
             client = get_client_exchange(
                 exchange_name="bybit",
                 acc_info={
-                    "api_key": api_key,
-                    "secret_key": api_secret,
-                    "passphrase": passphrase,
+                    "api_key": API_KEY,
+                    "secret_key": SECRET_KEY,
+                    "passphrase": PASSPHRASE,
                 },
                 symbol="BTC",
                 quote="USDT",
@@ -94,7 +98,7 @@ def main():
     result = {
         "success": True,
         "balances": balances,
-        "session_id": session_key,
+        "session_id": SESSION_ID,
         "exchange": "bybit",
         "timestamp": int(time.time()),
     }

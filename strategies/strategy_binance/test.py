@@ -21,7 +21,8 @@ from utils import (
     get_line_number,
     update_key_and_insert_error_log,
     generate_random_string,
-    get_precision_from_real_number
+    get_precision_from_real_number,
+    get_arg
 )
 
 class BTCTestStrategy:
@@ -221,17 +222,17 @@ def main():
     Main function to run the strategy
     """
     logger_access.info("Running BTC Test Strategy...")
-    
-    API_KEY = os.environ.get("STRATEGY_API_KEY")
-    SECRET_KEY = os.environ.get("STRATEGY_API_SECRET")
 
-    
-    PASSPHRASE = os.environ.get("STRATEGY_PASSPHRASE", "")  # Default to empty string if not set
+    SESSION_ID     = get_arg(1, '')
+    EXCHANGE       = get_arg(2, '')
+    API_KEY        = get_arg(3, '')
+    SECRET_KEY     = get_arg(4, '')
+    STRATEGY_NAME  = get_arg(5, '')
+    PASSPHRASE     = get_arg(6, '')
+    ASSET_FILTER   = ''
 
     if not API_KEY or not SECRET_KEY:
-        logger_access.info("Please set your Binance API credentials in environment variables:")
-        logger_access.info("   BINANCE_API_KEY")
-        logger_access.info("   BINANCE_SECRET_KEY")
+        logger_access.info("❌ API credentials are required")
         return
     
     try:

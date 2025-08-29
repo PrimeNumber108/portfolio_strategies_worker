@@ -31,7 +31,8 @@ sys.path.insert(0, PROJECT_ROOT)
 from logger import logger_error, logger_database, logger_access
 from utils import make_golang_api_call
 from exchange_api_spot.user import get_client_exchange
- 
+
+from decimal import Decimal, ROUND_DOWN,ROUND_UP
 
 
 def env(name: str, default: str = "") -> str:
@@ -123,7 +124,6 @@ def get_current_price(symbol: str, exchange: str) -> float:
             symbol=symbol.split("_")[0],  # Extract base symbol
             quote="USDT",
             session_key="price_check",
-            paper_mode=True
         )
         
         if client and hasattr(client, 'get_price'):
@@ -169,10 +169,10 @@ def create_opposite_paper_order(session_key: str, symbol: str, total_qty: float,
             "symbol": symbol,
             "side": order_side,
             "order_type": "MARKET",
-            "quantity": abs(total_qty),
+            "quantity": round(abs(total_qty), 4),
             "price": current_price,
             "avg_price": current_price,
-            "filled_quantity": abs(total_qty),
+            "filled_quantity": round(abs(total_qty), 4),
             "status": "filled",
             "exchange": exchange,
             "fee": 0.0,
@@ -226,14 +226,16 @@ def compute_balance(initial_balance: float, orders: List[Dict[str, Any]], sessio
         if sym not in positions:
             positions[sym] = {"qty": 0.0}
 
+        sum_money_of_orders -= 2*fee # 2 times fee to account for both buy and sell fees
+
         if side == "BUY":
             # Don't modify cash - keep it at 1000 USDT
             positions[sym]["qty"] += qty
-            sum_money_of_orders += qty * price + fee  # Money spent on buying
+            sum_money_of_orders += -qty * price  # Money spent on buying
         elif side == "SELL":
             # Don't modify cash - keep it at 1000 USDT
-            positions[sym]["qty"] -= qty
-            sum_money_of_orders -= qty * price - fee  # Money received from selling (negative)
+            positions[sym]["qty"] += -qty
+            sum_money_of_orders += qty * price   # Money received from selling (negative)
         else:
             continue
 
@@ -267,7 +269,7 @@ def compute_balance(initial_balance: float, orders: List[Dict[str, Any]], sessio
         logger_database.info(f"Current price for {main_symbol}: {current_price}")
         
         # Calculate: sum_qty * current_price
-        sum_opposite_orders_at_current_price = abs(total_position_qty) * current_price
+        sum_opposite_orders_at_current_price = (total_position_qty) * current_price 
         
         logger_database.info(f"Total position qty: {total_position_qty}, Current price: {current_price}, Opposite value: {sum_opposite_orders_at_current_price}")
 
@@ -276,8 +278,9 @@ def compute_balance(initial_balance: float, orders: List[Dict[str, Any]], sessio
         # Determine side based on sum_money_of_orders:
         # If sum_money_of_orders is negative => side is SELL
         # If sum_money_of_orders is positive => side is BUY
-        opposite_side = "BUY" if sum_money_of_orders < 0 else "SELL"
+        opposite_side = "BUY" if total_position_qty < 0 else "SELL"
         
+
         create_opposite_paper_order(
             session_key=session_key,
             symbol=main_symbol,
@@ -291,7 +294,7 @@ def compute_balance(initial_balance: float, orders: List[Dict[str, Any]], sessio
     logger_database.info(f'sum_opposite_orders_at_current_price: {sum_opposite_orders_at_current_price}')
 
     # Calculate total USDT value: cash - sum_money_of_orders + sum_opposite_orders_at_current_price
-    total_usdt_value = cash - sum_money_of_orders + sum_opposite_orders_at_current_price
+    total_usdt_value = cash + sum_money_of_orders + sum_opposite_orders_at_current_price
     
     balances["USDT"] = {"amount": round(total_usdt_value, 8)}
     balances["Total"] = round(total_usdt_value, 8)
@@ -305,11 +308,14 @@ def compute_balance(initial_balance: float, orders: List[Dict[str, Any]], sessio
         "exchange": exchange,
         "orders_count": len(orders),
     }
-
+def get_arg(index, default=''):
+    return sys.argv[index] if len(sys.argv) > index else default
 
 def main():
     logger_access.info("Starting paper trade result checker...")
-    session_key = get_session_key()
+    session_key     = get_arg(1, '')
+
+    logger_access.info(f"Using session key: {session_key}")
     if not session_key:
         result = {
             "success": True,
@@ -322,11 +328,14 @@ def main():
     base_url = get_base_url()
 
     try:
+        logger_access.info(f"Using session key 2: {session_key}")
         payload = fetch_last_balance(base_url, session_key)
         if not payload.get("success"):
             raise RuntimeError(payload)
         initial_balance = float(payload.get("initial_balance") or 0)
         orders = payload.get("orders") or []
+        logger_access.info(f"order is:: {orders}")
+
         logger_access.info("run result success 1")
         result = compute_balance(initial_balance, orders, session_key)
         logger_access.info("run result success 2")

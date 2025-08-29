@@ -316,18 +316,23 @@ class BinanceBalanceChecker:
             return {
                 "Total": 0.0
             }
-
+def get_arg(index, default=''):
+        return sys.argv[index] if len(sys.argv) > index else default
 def main():
     """
     Main function to run the balance checker
+    Expects command line arguments: session_key, exchange, api_key, api_secret, strategy_name, [passphrase]
     """
     print("🔍 Running Binance Balance Checker...")
     
-    API_KEY = os.environ.get('STRATEGY_API_KEY', '')
-    SECRET_KEY = os.environ.get('STRATEGY_API_SECRET', '')
-    PASSPHRASE = os.environ.get('STRATEGY_PASSPHRASE', '')  # Not used for Binance
-    SESSION_ID = os.environ.get('STRATEGY_SESSION_KEY', '')
-    ASSET_FILTER = os.environ.get('STRATEGY_ASSET_FILTER', '')
+    
+    SESSION_ID     = get_arg(1, '')
+    EXCHANGE       = get_arg(2, '')
+    API_KEY        = get_arg(3, '')
+    SECRET_KEY     = get_arg(4, '')
+    STRATEGY_NAME  = get_arg(5, '')
+    PASSPHRASE     = get_arg(6, '')
+    ASSET_FILTER   = ''
 
     if not API_KEY or not SECRET_KEY:
         error_result = {

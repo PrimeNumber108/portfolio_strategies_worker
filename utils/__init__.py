@@ -11,7 +11,7 @@ from .utils_general import (mode, mode_test, mode_encrypt, r2, r7,r8, r9,
                     get_run_key_status,
                     update_key_and_insert_error_log,
                     get_line_number)
-
+from .parse_function import (get_arg)
 from .utils_time import convert_time, convert_to_datetime_index, calculate_gap_hours
 from .utils_strategy_status import (calculate_param_wash, 
                                     delete_strategy_key,
