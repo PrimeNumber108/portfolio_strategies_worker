@@ -276,10 +276,6 @@ def main():
     
     logger_access.info(f"Parameters 2: {params}")
 
-    logger_access.info(f"🔄 Starting spot order cancellation for session: {SESSION_ID}")
-    logger_access.info(f"🔄 Starting spot order cancellation for exchange: {EXCHANGE}")
-    logger_access.info(f"🔄 Starting spot order cancellation for api_key: {API_KEY}")
-    logger_access.info(f"🔄 Starting spot order cancellation for api_secret: {SECRET_KEY}")
 
     if not API_KEY or not SECRET_KEY:
         logger_access.info("❌ Please set your Poloniex API credentials in environment variables:")

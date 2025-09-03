@@ -334,41 +334,30 @@ def main():
     """Main function"""
     logger_access.info("🎯 Strategy Runner Starting...")
     logger_access.info("=" * 50)
-    
-    # Check command line arguments
-    # if len(sys.argv) < 2:
-    #     logger_access.info("❌ Usage: python3 strategy_runner.py <config_file>")
-    #     return 1
-    
-    config_path = get_arg(1, '')
-    logger_access.info(f"📁 Config file: {config_path}")
-    print('config_path:: ',config_path)
-    # Load configuration
-    config = load_config(config_path)
-    if not config:
+
+    # Initialize params from CLI arguments
+    try:
+        args = sys.argv[1:]
+        set_constants(args)
+    except Exception as e:
+        logger_access.error(f"❌ Failed to parse CLI params: {e}")
         return 1
-    
+
+    params = get_constants()
+
     logger_access.info("\n" + "=" * 50)
     logger_access.info("🌍 Hello World from Python Strategy Runner!")
     logger_access.info("=" * 50)
-    
-    logger_access.info(f"📊 Session Key: {config.get('session_key', 'N/A')}")
-    logger_access.info(f"🎯 Strategy Name: {config.get('strategy_name', 'N/A')}")
-    logger_access.info(f"📝 Strategy Code: {config.get('strategy_code', 'N/A')}")
-    logger_access.info(f"👤 Username: {config.get('username', 'N/A')}")
-    logger_access.info(f"🏦 Exchange: {config.get('exchange', 'N/A')}")
-    logger_access.info(f"💰 Initial Balance: ${config.get('initial_balance', 0):,.2f}")
-    logger_access.info(f"⚡ Risk Level: {config.get('risk_level', 'N/A')}")
-    logger_access.info(f"📈 Asset Class: {config.get('asset_class', 'N/A')}")
-    logger_access.info(f"⏰ Timeframe: {config.get('timeframe', 'N/A')}")
-    logger_access.info(f"🕐 Start Time: {config.get('start_time', 'N/A')}")
-    logger_access.info(f"📝 Paper Trading: {config.get('paper_trading', False)}")
-    logger_access.info(f"🔄 Continuous Mode: {config.get('continuous_mode', False)}")
-    logger_access.info(f"🎯 Trading Mode: {config.get('trading_mode', 'N/A')}")
-    
-    # Find and execute strategy directory
-    strategy_name = config.get('strategy_name', '')
-    
+
+    # Log key parameters
+    logger_access.info(f"📊 Session ID: {params.get('SESSION_ID', 'N/A')}")
+    logger_access.info(f"🎯 Strategy Name: {params.get('STRATEGY_NAME', 'N/A')}")
+    logger_access.info(f"🏦 Exchange: {params.get('EXCHANGE', 'N/A')}")
+    logger_access.info(f"📝 Paper Mode: {params.get('PAPER_MODE', False)}")
+
+    # Determine strategy directory
+    strategy_name = params.get('STRATEGY_NAME', '') or ''
+
     # First, check if STRATEGY_DIR environment variable is set
     strategy_dir_env = os.environ.get('STRATEGY_DIR')
     if strategy_dir_env:
@@ -378,10 +367,10 @@ def main():
         strategy_dir = find_strategy_directory(strategy_name)
     else:
         strategy_dir = None
-    print('strategy_dir:: ',strategy_dir)
+
     logger_access.info(f"🔍 Strategy directory: {strategy_dir}")
     if strategy_dir and strategy_dir.exists():
-        success = execute_all_strategies(strategy_dir, config)
+        success = execute_all_strategies(strategy_dir, params)
         if success:
             logger_access.info("\n✅ All strategy files executed successfully!")
             return 0
@@ -390,7 +379,7 @@ def main():
             return 1
     else:
         logger_access.info(f"\n⚠️  Strategy directory not found, running in demo mode")
-    
+
     logger_access.info("\n🎉 Demo execution completed successfully!")
     logger_access.info("=" * 50)
     return 0
