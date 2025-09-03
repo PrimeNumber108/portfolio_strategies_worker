@@ -46,7 +46,7 @@ def cancel_spot_orders(session_key: str, api_key: str, secret_key: str, exchange
             'passphrase': passphrase,
             'session_key': session_key
         }
-        
+        logger_access.info(f"account info zzz: {acc_info}")
         # Get exchange client
         client = get_client_exchange(
             exchange_name=exchange_name,
@@ -55,16 +55,26 @@ def cancel_spot_orders(session_key: str, api_key: str, secret_key: str, exchange
             quote=quote,
             session_key=session_key,
         )
+        logger_access.info(f"✅ Created {exchange_name} spot client successfully")
+        logger_access.info(f"symbol: {symbol}, quote: {quote}")
         
         if not client:
             raise Exception(f"Failed to create client for exchange: {exchange_name}")
         
         logger_access.info(f"✅ Created {exchange_name} spot client successfully")
         
-        # Get open orders
+        # Get open orders (any symbol) and cancel by order ID
         try:
-            open_orders = client.get_open_orders()
-            logger_access.info(f"📋 Found {len(open_orders) if open_orders else 0} open spot orders")
+            open_orders_resp = client.get_open_orders()
+            # Normalize to a list for all client types
+            if isinstance(open_orders_resp, dict):
+                open_orders = open_orders_resp.get('data') or open_orders_resp.get('orders') or []
+            elif isinstance(open_orders_resp, list):
+                open_orders = open_orders_resp
+            else:
+                open_orders = []
+
+            logger_access.info(f"📋 Found {len(open_orders)} open spot orders")
             
             if not open_orders:
                 return {
