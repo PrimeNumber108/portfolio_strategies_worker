@@ -4,8 +4,8 @@ from exchange_api_future.binance_future import BinanceFuturePrivate
 from logger import logger_access, logger_error, logger_database
 
 # Replace these with your actual Hyperliquid credentials
-SECRET_KEY = 'GlqwZKkXFMPW0YZBB8ow3fsBXHVK7iT5VppwJrWnYU1Ibal7JBZWSvXt2bD3qsI6'  # Your wallet private key
-API_KEY = 'I1ji7rWqb3lhwScJeq5nyELErdVe6Z3rupwG8iCGYqK47dZQOfHjDpbk1fJmsyKT'  # Your wallet address (0x...)
+SECRET_KEY = 'c35FvHdmEprSdqXqv11pCA8mjTvoswWW90VqWzEcHuN3RIQ5fZ0PZboqW3ed8Ta2'  # Your wallet private key
+API_KEY = 'aunuHUuEqX4PGB8pj8lA3jFYlCSzLpTME4VU2B7hiGyc0YFJN8xqpQD7Fy3433Js'  # Your wallet address (0x...)
 
 symbol = 'BTC'  # Default symbol to test with
 def main():

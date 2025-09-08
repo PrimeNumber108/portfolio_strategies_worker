@@ -6,6 +6,8 @@ Handles canceling open orders for both spot and futures trading.
 
 import sys
 import os
+import json
+from typing import Dict, Any, Optional, List, Set
 
 # Add the parent directory to the path to import our modules
 CURRENT_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -15,29 +17,60 @@ sys.path.insert(0, PROJECT_ROOT)
 from exchange_api_spot.user import get_client_exchange
 from exchange_api_future.user import get_client_exchange as get_future_client_exchange
 from logger import logger_database, logger_error, logger_access
-from typing import Dict, Any, Optional, List
 from utils import get_arg
+from utils import make_golang_api_call
+
+
+def _get_golang_base_url() -> str:
+    # Prefer GOLANG_API_BASE_URL if provided; fallback to GOLANG_MGMT_API_URL used in auth util
+    return os.getenv("GOLANG_API_BASE_URL") or os.getenv("GOLANG_MGMT_API_URL", "http://localhost:8083")
+
+
+def fetch_session_symbols(session_key: str) -> Set[str]:
+    """Fetch symbols from Go service for a session and return an uppercase set.
+    Uses GET /api/v1/orders/orders/session/:session_key
+    """
+    try:
+        base_url = _get_golang_base_url()
+        endpoint = f"/api/v1/orders/orders/session/{session_key}?limit=1000"
+        logger_access.info(f"📡 Fetching session symbols from {endpoint}")
+        resp = make_golang_api_call(method="GET", endpoint=endpoint, data=None, base_url=base_url)
+        symbols: Set[str] = set()
+        if isinstance(resp, dict):
+            orders = resp.get("orders") or []
+            for o in orders:
+                sym = o.get("symbol")
+                if sym:
+                    symbols.add(str(sym).upper())
+        logger_access.info(f"📡 Session {session_key} symbols from Go: {sorted(symbols)}")
+        return symbols
+    except Exception as e:
+        logger_error.error(f"❌ Failed to fetch session symbols: {e}")
+        return set()
+
+
+def _extract_order_symbol(order: Dict[str, Any]) -> Optional[str]:
+    """Try to extract a symbol like BTCUSDT from various order schemas."""
+    sym = order.get("symbol") or order.get("pair") or order.get("symbol_pair")
+    if not sym and order.get("base") and order.get("quote"):
+        sym = f"{order['base']}{order['quote']}"
+    return str(sym).upper() if sym else None
 
 
 def cancel_spot_orders(session_key: str, api_key: str, secret_key: str, exchange_name: str, 
                       passphrase: str = "", symbol: str = "BTC", quote: str = "USDT") -> Dict[str, Any]:
     """
-    Cancel all open spot orders for a trading session.
-    
-    Args:
-        session_key: Trading session identifier
-        api_key: Exchange API key
-        secret_key: Exchange secret key
-        exchange_name: Name of the exchange (binance, poloniex, etc.)
-        passphrase: Exchange passphrase (if required)
-        symbol: Base symbol (default: BTC)
-        quote: Quote symbol (default: USDT)
-        
-    Returns:
-        Dict containing success status and details
+    Cancel open spot orders for a trading session, filtered by symbols traded in the session (from Go API).
     """
     try:
         logger_access.info(f"🔄 Starting spot order cancellation for session: {session_key}")
+
+        # Fetch allowed symbols from Go service for this session
+        allowed_symbols = fetch_session_symbols(session_key)
+        if allowed_symbols:
+            logger_access.info(f"✅ Will only cancel symbols: {sorted(allowed_symbols)}")
+        else:
+            logger_access.info("⚠️ No symbols from Go service; will not filter (cancel all open spot orders)")
         
         # Prepare account info
         acc_info = {
@@ -46,7 +79,7 @@ def cancel_spot_orders(session_key: str, api_key: str, secret_key: str, exchange
             'passphrase': passphrase,
             'session_key': session_key
         }
-        logger_access.info(f"account info zzz: {acc_info}")
+        
         # Get exchange client
         client = get_client_exchange(
             exchange_name=exchange_name,
@@ -56,14 +89,11 @@ def cancel_spot_orders(session_key: str, api_key: str, secret_key: str, exchange
             session_key=session_key,
         )
         logger_access.info(f"✅ Created {exchange_name} spot client successfully")
-        logger_access.info(f"symbol: {symbol}, quote: {quote}")
         
         if not client:
             raise Exception(f"Failed to create client for exchange: {exchange_name}")
         
-        logger_access.info(f"✅ Created {exchange_name} spot client successfully")
-        
-        # Get open orders (any symbol) and cancel by order ID
+        # Get open orders (any symbol) and filter/cancel by order ID
         try:
             open_orders_resp = client.get_open_orders()
             # Normalize to a list for all client types
@@ -74,12 +104,21 @@ def cancel_spot_orders(session_key: str, api_key: str, secret_key: str, exchange
             else:
                 open_orders = []
 
-            logger_access.info(f"📋 Found {len(open_orders)} open spot orders")
+            logger_access.info(f"📋 Found {len(open_orders)} open spot orders (before filter)")
+            logger_access.info(f"📋 allowed_symbols: {allowed_symbols}")
+            if allowed_symbols:
+                filtered_orders: List[Dict[str, Any]] = []
+                for o in open_orders:
+                    osym = _extract_order_symbol(o)
+                    if osym and osym in allowed_symbols:
+                        filtered_orders.append(o)
+                open_orders = filtered_orders
+                logger_access.info(f"📋 {len(open_orders)} orders remain after symbol filter")
             
             if not open_orders:
                 return {
                     'success': True,
-                    'message': 'No open spot orders to cancel',
+                    'message': 'No open spot orders to cancel (after filtering)',
                     'cancelled_orders': [],
                     'failed_orders': []
                 }
@@ -164,18 +203,6 @@ def cancel_future_orders(session_key: str, api_key: str, secret_key: str, exchan
                         passphrase: str = "", symbol: str = "BTC", quote: str = "USDT") -> Dict[str, Any]:
     """
     Cancel all open futures orders for a trading session.
-    
-    Args:
-        session_key: Trading session identifier
-        api_key: Exchange API key
-        secret_key: Exchange secret key
-        exchange_name: Name of the exchange (binance, poloniex, etc.)
-        passphrase: Exchange passphrase (if required)
-        symbol: Base symbol (default: BTC)
-        quote: Quote symbol (default: USDT)
-        
-    Returns:
-        Dict containing success status and details
     """
     try:
         logger_access.info(f"🔄 Starting futures order cancellation for session: {session_key}")
@@ -296,19 +323,6 @@ def cancel_orders(session_key: str, api_key: str, secret_key: str, exchange_name
                  quote: str = "USDT") -> Dict[str, Any]:
     """
     Cancel orders based on trading type (spot or futures).
-    
-    Args:
-        session_key: Trading session identifier
-        api_key: Exchange API key
-        secret_key: Exchange secret key
-        exchange_name: Name of the exchange
-        trading_type: Type of trading ("spot" or "futures")
-        passphrase: Exchange passphrase (if required)
-        symbol: Base symbol
-        quote: Quote symbol
-        
-    Returns:
-        Dict containing success status and details
     """
     try:
         logger_access.info(f"🔄 Starting order cancellation - Type: {trading_type}, Exchange: {exchange_name}")
@@ -336,7 +350,6 @@ if __name__ == "__main__":
     # Test the functions
     logger_access.info("🧪 Testing cancel_order.py")
     
-
     SESSION_ID     = get_arg(1, '')
     EXCHANGE       = get_arg(2, '')
     API_KEY        = get_arg(3, '')
@@ -354,4 +367,4 @@ if __name__ == "__main__":
         trading_type="spot"
     )
     
-    logger_access.info(f"📊 Test result: {result}")
+    logger_access.info(f"📊 Test result: {json.dumps(result)}")

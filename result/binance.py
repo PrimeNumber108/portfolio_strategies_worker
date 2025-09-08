@@ -58,7 +58,6 @@ class BinanceBalanceChecker:
                 acc_info=account_info,
                 symbol=self.symbol,
                 quote=self.quote,
-                use_proxy=False  # Disable proxy to avoid connection issues
             )
             print(f"Binance client initialized successfully for session: {session_id}")
             print(f"Client type: {type(self.client)}")

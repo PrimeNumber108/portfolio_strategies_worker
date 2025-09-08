@@ -58,7 +58,6 @@ class BinanceBalanceChecker:
                 acc_info=account_info,
                 symbol=self.symbol,
                 quote=self.quote,
-                use_proxy=False  # Disable proxy to avoid connection issues
             )
             print(f"Binance client initialized successfully for session: {session_id}")
             print(f"Client type: {type(self.client)}")
@@ -328,10 +327,10 @@ def main():
     
     SESSION_ID     = get_arg(1, '')
     EXCHANGE       = get_arg(2, '')
-    API_KEY        = get_arg(3, '')
-    SECRET_KEY     = get_arg(4, '')
+    API_KEY        = get_arg(3, '1NIa5hwqarZVyWS8msrhxn0tcKZChkrRhRjXKsmkQkdHpfCWr8MJi9NFA7mT69Ar')
+    SECRET_KEY     = get_arg(4, 'Lq5Fe8tnJC7T6cVWo2qN1qQSrCRn9imx4l28PYUrF47me8afhmY5PZ6ry6T3Eyuj')
     STRATEGY_NAME  = get_arg(5, '')
-    PASSPHRASE     = get_arg(6, '')
+    PASSPHRASE     = get_arg(6, 'metispremani123')
     ASSET_FILTER   = ''
 
     if not API_KEY or not SECRET_KEY:

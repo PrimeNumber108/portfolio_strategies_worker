@@ -289,6 +289,7 @@ class PoloniexPrivate:
             return False
     
     def place_order(self, side_order, quantity, order_type, price='', force='normal'): 
+        logger_access.info('Placing order test')
         force = 'GTC' if force == 'normal' else force
         symbol = f'{self.base}_{self.quote}'
         if self.base == "":
@@ -298,7 +299,8 @@ class PoloniexPrivate:
             raise ValueError("Failed to get current price")
         price_scale = self.price_scale
         quantity_scale = self.qty_scale
-        
+        logger_access.info("log 1")
+        logger_access.info(f"quantity: {format(float(quantity), f'.{quantity_scale}f')}")
         params_map = {
             "symbol": symbol,
             "side": side_order.upper(),
@@ -308,7 +310,9 @@ class PoloniexPrivate:
         }
         if price:
             params_map["price"] = price
-            
+        
+        logger_access.info("log 2")
+
         if order_type.upper() == 'MARKET' and 'price' in params_map:
             del params_map['price']
         
@@ -321,7 +325,9 @@ class PoloniexPrivate:
         body = {}
         body.update(params_map)
 
-        
+        logger_access.info("log 3")
+        logger_access.info(f'Placing order with body: {body}')
+
         result = self._request('POST', '/orders', True, body=body)
         logger_access.info('result test: ',result)
         

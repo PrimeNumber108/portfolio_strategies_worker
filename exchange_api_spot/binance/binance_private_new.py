@@ -26,7 +26,7 @@ class BinancePrivateNew:
     """
     Class for interacting with the Binance Spot API.
     """
-    def __init__ (self, symbol, quote, api_key, secret_key, passphrase ='', use_proxy=True, session_key=''):
+    def __init__ (self, symbol, quote, api_key, secret_key, passphrase ='', session_key=''):
         self.symbol = symbol
         self.quote = quote
         self.symbol_ex = f'{symbol}{quote}'
@@ -39,8 +39,8 @@ class BinancePrivateNew:
         self.passphrase = passphrase
         self.session_key = session_key or str(uuid.uuid4())  # Generate unique session key if not provided
         # Use proxy_list[0] (None) for no proxy, or proxy_list[1] for proxy
-        proxy_to_use = proxy_list[1] if use_proxy else proxy_list[0]
-        self.client = Spot(api_key, secret_key, proxies=proxy_to_use)
+        # proxy_to_use = proxy_list[1] if use_proxy else proxy_list[0]
+        self.client = Spot(api_key, secret_key)
         scale_redis = r.get(f'{self.symbol_redis}_binance_scale')
         if scale_redis is not None:
             scale = json.loads(scale_redis)

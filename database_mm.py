@@ -45,17 +45,26 @@ def get_connection():
 
 def close_connection(connection, cursor):
     """
-    Closes a MySQL connection and cursor.
+    Safely close a MySQL cursor and connection. Accepts None and logs close errors.
 
     Args:
-        connection (mysql.connector.connection.MySQLConnection): The MySQL connection object.
-        cursor (mysql.connector.cursor.MySQLCursor): The MySQL cursor object.
-
-    Returns:
-        None
+        connection: The MySQL connection object or None.
+        cursor: The MySQL cursor object or None.
     """
-    cursor.close()
-    connection.close()
+    try:
+        if cursor is not None:
+            try:
+                cursor.close()
+            except Exception as e:
+                logger_database.error(f"Error closing cursor: {e}")
+        if connection is not None:
+            try:
+                connection.close()
+            except Exception as e:
+                logger_database.error(f"Error closing connection: {e}")
+    except Exception:
+        # Ensure close never raises further exceptions
+        pass
 
 def execute_script_location(abs_paths_list):
     """
