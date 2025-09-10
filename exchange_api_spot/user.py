@@ -115,7 +115,6 @@ def _get_client_exchange(exchange_name = "", acc_info='', symbol='BTC', quote="U
             api_key=acc_info['api_key'], 
             secret_key=acc_info['secret_key'], 
             passphrase=acc_info.get('passphrase', ''),
-            use_proxy=False
         )
         
     elif exchange_name == 'binance_old':
