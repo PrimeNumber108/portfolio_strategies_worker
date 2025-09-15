@@ -51,6 +51,30 @@ class BinancePrivateNew:
                                 'qtyScale':self.qty_scale})
             r.set(f'{self.symbol_redis}_binance_scale', scale)
 
+    def update_symbol(self, symbol):
+        """
+        Updates the symbol attribute of the class instance.
+        """
+        self.symbol = symbol
+        self.symbol_ex = f"{self.symbol}{self.quote}"
+        self.symbol_redis = f"{self.symbol}_{self.quote}".upper()
+        
+        ## Update Redis
+        scale_redis = r.get(f'{self.symbol_redis}_binance_scale')
+        if scale_redis is not None:
+            scale = json.loads(scale_redis)
+            self.price_scale, self.qty_scale = int(scale["priceScale"]), int(scale["qtyScale"])
+        else:
+            self.price_scale, self.qty_scale = self.get_scale()
+            scale = json.dumps({'priceScale':self.price_scale,
+                                'qtyScale':self.qty_scale})
+            r.set(f'{self.symbol_redis}_binance_scale', scale)
+        
+    def update_quote(self, quote):
+        """
+        Updates the quote attribute of the class instance.
+        """
+        self.quote = quote
 
     def get_scale(self):
         """

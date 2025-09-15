@@ -80,7 +80,7 @@ class PaperTrade:
         self._load_scales()
         
         # Initialize account balances via Go API if not exists
-        self._init_account_balance()
+        # self._init_account_balance()
         
         logger_access.info(f"✅ Paper Trade initialized for {self.symbol}/{self.quote} using {self.exchange} data")
         logger_database.info(f"Paper Trade initialized: {self.symbol}/{self.quote}, exchange: {self.exchange}")
@@ -105,6 +105,7 @@ class PaperTrade:
 
     def _init_account_balance(self):
         """Initialize account balances via Go API if they don't exist"""
+        logger_access.info("check 1233333")
         try:
             # Check if balances already exist by trying to get them
             balance_response = make_golang_api_call(

@@ -46,6 +46,8 @@ class BinancePrivate:
     Class for interacting with the Binance Spot API.
     """
     def __init__ (self, symbol, quote = 'USDT', api_key = '', secret_key = '', passphrase = ''):
+        self._symbol = None
+        self._quote = None
         self.symbol = symbol
         self.symbol_ex = f'{symbol}{quote}'
         self.symbol_redis = f'{symbol}_{quote}'.upper()
@@ -66,6 +68,42 @@ class BinancePrivate:
             scale = json.dumps({'priceScale':self.price_scale,
                                 'qtyScale':self.qty_scale})
             r.set(f'{self.symbol_redis}_binance_scale', scale)
+
+    @property
+    def symbol(self):
+        """Getter method for the symbol property."""
+        return self._symbol
+
+    @symbol.setter
+    def symbol(self, value):
+        self._symbol = value
+        self.update_symbol_data()
+
+    @property
+    def quote(self):
+        return self._quote
+
+    @quote.setter
+    def quote(self, value):
+        self._quote = value
+        self.update_symbol_data()
+
+    def update_symbol_data(self):
+        """Recalculate symbol_ex, symbol_redis, and scales when symbol/quote changes."""
+        if self._symbol and self._quote:
+            self.symbol_ex = f"{self._symbol}{self._quote}"
+            self.symbol_redis = f"{self._symbol}_{self._quote}".upper()
+
+            # Redis check
+            scale_redis = r.get(f'{self.symbol_redis}_binance_scale')
+            if scale_redis is not None:
+                scale = json.loads(scale_redis)
+                self.price_scale, self.qty_scale = int(scale["priceScale"]), int(scale["qtyScale"])
+            else:
+                self.price_scale, self.qty_scale = self.get_scale()
+                scale = json.dumps({'priceScale': self.price_scale, 'qtyScale': self.qty_scale})
+                r.set(f'{self.symbol_redis}_binance_scale', scale)
+
 
     def get_scale(self):
         """

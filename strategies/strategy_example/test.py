@@ -31,6 +31,7 @@ from utils import (
 ## General log ##
 from logger import logger_access, logger_error
 
+## Private log ##
 from logger import setup_logger_global
 
 
