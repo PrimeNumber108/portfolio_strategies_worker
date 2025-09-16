@@ -219,7 +219,7 @@ def execute_strategy_file(script_path, config):
         ## set argv
         args = sys.argv[1:]
         set_constants(args)
-        logger_access.info(f"Parameters: {args}")
+        logger_access.info(f"Parameters zzs: {args}")
 
         if config.get('paper_trading', False):
             logger_access.info("📝 Paper trading mode enabled")

@@ -203,7 +203,8 @@ def create_opposite_paper_order(session_key: str, symbol: str, total_qty: float,
 
 
 def compute_balance(initial_balance: float, orders: List[Dict[str, Any]], session_key: str = "") -> Dict[str, Any]:
-    cash = 1000.0  # Fixed cash amount - always 1000 USDT
+    # Seed cash from provided initial balance
+    cash = float(initial_balance)
     positions: Dict[str, Dict[str, float]] = {}
     last_trade_price: Dict[str, float] = {}
 
@@ -313,13 +314,16 @@ def get_arg(index, default=''):
 
 def main():
     logger_access.info("Starting paper trade result checker...")
-    session_key     = get_arg(1, '')
+    session_key = get_arg(1, '')
+    # CLI args layout from Go: 1=session_key, 2=exchange, 3=api_key, 4=api_secret, 5=strategy_name, 6=initial_balance
+    initial_balance_cli = get_arg(6, '')
 
     logger_access.info(f"Using session key: {session_key}")
     if not session_key:
+        ib = float(initial_balance_cli) if initial_balance_cli else 1000.0
         result = {
             "success": True,
-            "balances": {"USDT": {"amount": 1000.0}, "Total": 1000.0},
+            "balances": {"USDT": {"amount": ib}, "Total": ib},
             "warning": "Missing STRATEGY_SESSION_KEY; using defaults",
         }
         print("RESULT: " + json.dumps(result))
@@ -332,9 +336,11 @@ def main():
         payload = fetch_last_balance(base_url, session_key)
         if not payload.get("success"):
             raise RuntimeError(payload)
-        initial_balance = float(payload.get("initial_balance") or 0)
+        # Prefer CLI-provided initial balance if present, else payload
+        initial_balance = float(initial_balance_cli) if initial_balance_cli else float(payload.get("initial_balance") or 0)
         orders = payload.get("orders") or []
         logger_access.info(f"order is:: {orders}")
+        logger_access.info(f"initial_balance used: {initial_balance}")
 
         logger_access.info("run result success 1")
         result = compute_balance(initial_balance, orders, session_key)

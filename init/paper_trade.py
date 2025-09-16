@@ -28,7 +28,7 @@ CURRENT_DIR = os.path.dirname(os.path.abspath(__file__))
 PROJECT_ROOT = os.path.abspath(os.path.join(CURRENT_DIR, "../"))
 sys.path.insert(0, PROJECT_ROOT)
 
-from logger import logger_error, logger_database
+from logger import logger_error, logger_database, logger_access
 
 def get_arg(index, default=''):
     return sys.argv[index] if len(sys.argv) > index else default
@@ -45,8 +45,9 @@ def main():
     SECRET_KEY     = get_arg(4, '')
     STRATEGY_NAME  = get_arg(5, '')
     PASSPHRASE     = get_arg(6, '')
+    INITIAL_BALANCE = get_arg(7, '')
     ASSET_FILTER   = ''
-    
+    logger_access.info(f"INITIAL_BALANCE: ,{INITIAL_BALANCE}")
 
     # Fixed paper initial balance
     initial_balance = 1000.0
