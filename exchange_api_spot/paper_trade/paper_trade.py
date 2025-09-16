@@ -403,7 +403,7 @@ class PaperTrade:
         try:
             response = make_golang_api_call(
                 method="GET",
-                endpoint=f"/api/v1/paper/balances?session_key={self.session_key}",
+                endpoint=f"/api/v1/execute/paper/balances?session_key={self.session_key}",
                 base_url=GOLANG_API_BASE_URL
             )
             
@@ -433,7 +433,7 @@ class PaperTrade:
         try:
             response = make_golang_api_call(
                 method="GET",
-                endpoint=f"/api/v1/paper/balances?session_key={self.session_key}",
+                endpoint=f"/api/v1/execute/paper/balances?session_key={self.session_key}",
                 base_url=GOLANG_API_BASE_URL
             )
             
@@ -545,6 +545,70 @@ class PaperTrade:
                 
                 logger_access.info(f"✅ Paper trade order placed: {side_order} {quantity} {self.base} at {execution_price}")
                 logger_database.info(f"Paper trade order: {order_result.get('order_id')}, {side_order}, {quantity}@{execution_price}")
+                
+                # After placing order, compute new balances locally and push to Go service
+                try:
+                    try:
+                        from exchange_api_spot.paper_trade.compute_bl import compute_post_trade_balances
+                    except ImportError:
+                        # Fallback import if package path differs
+                        from paper_trade.compute_bl import compute_post_trade_balances
+                    
+                    # Fetch current balances from Go (authoritative before applying this trade)
+                    balance_resp = self.get_account_balance()
+                    logger_access.info(f"Got current balances: {balance_resp}")
+                    balances = balance_resp.get('data', {}) if isinstance(balance_resp, dict) else {}
+                    
+                    # Ensure dict structure for involved assets
+                    if self.base not in balances:
+                        balances[self.base] = {"asset": self.base, "available": 0.0, "locked": 0.0, "total": 0.0}
+                    if self.quote not in balances:
+                        balances[self.quote] = {"asset": self.quote, "available": 0.0, "locked": 0.0, "total": 0.0}
+                    
+                    # Compute post-trade balances with fee
+                    fee_rate = float(os.environ.get('PAPER_TRADE_FEE_RATE', 0) or 0)
+                    updated = compute_post_trade_balances(
+                        balances=balances,
+                        side=side_order,
+                        base_asset=self.base,
+                        quote_asset=self.quote,
+                        price=float(execution_price),
+                        quantity=float(quantity),
+                        fee_rate=fee_rate,
+                    )
+                    logger_access.info(f"Updated balances: {updated}")
+                    # Compute current balance valued in quote currency
+                    base_total = float(updated.get(self.base, {}).get('total', 0.0))
+                    quote_total = float(updated.get(self.quote, {}).get('total', 0.0))
+                    current_balance_val = quote_total + base_total * float(execution_price)
+                    logger_access.info(f"Current balance valued in {self.quote}: {current_balance_val}")
+                    # Serialize token totals
+                    current_tokens_dict = {
+                        self.base: base_total,
+                        self.quote: quote_total,
+                    }
+                    current_tokens_json = json.dumps(current_tokens_dict)
+                    
+                    # Push to Go execution service
+                    upd_payload = {
+                        "session_key": self.session_key,
+                        "current_balance": float(current_balance_val),
+                        "current_tokens_value": current_tokens_json,
+                    }
+
+                    logger_access.info(f"upd_payload: ",upd_payload)
+                    upd_resp = make_golang_api_call(
+                        method="POST",
+                        endpoint="/api/v1/execute/paper/update-balance",
+                        data=upd_payload,
+                        base_url=GOLANG_API_BASE_URL,
+                    )
+                    if upd_resp and upd_resp.get('success'):
+                        logger_access.info(f"✅ Updated paper current balance: {current_balance_val}")
+                    else:
+                        logger_access.info(f"⚠️ Failed to update current balance: {upd_resp}")
+                except Exception as e:
+                    logger_error.error(f"⚠️ Error updating current balance post-order: {e}")
                 
                 return {
                     'code': 0,
