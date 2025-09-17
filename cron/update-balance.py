@@ -249,7 +249,7 @@ def run_once():
 
 
 def main():
-    interval_sec = int(os.environ.get("UPDATE_BALANCE_INTERVAL_SEC", "30"))  # default 3 minutes
+    interval_sec = int(os.environ.get("UPDATE_BALANCE_INTERVAL_SEC", "180"))  # default 3 minutes
     logger_access.info(
         f"Starting update-balance cron loop, interval={interval_sec}s, base_url={GOLANG_API_BASE_URL}, apply_fees={APPLY_PAPER_ORDER_FEES_IN_BALANCE}"
     )
