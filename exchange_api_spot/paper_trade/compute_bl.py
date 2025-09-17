@@ -3,6 +3,7 @@
 # Fees: BUY fee charged in base asset; SELL fee charged in quote asset.
 
 from typing import Dict, Tuple
+import os
 
 BalanceRow = Dict[str, float]
 Balances = Dict[str, BalanceRow]
@@ -39,6 +40,26 @@ def split_symbol(symbol: str) -> Tuple[str, str]:
     raise ValueError(f"Cannot split symbol: {symbol}. Provide base/quote explicitly.")
 
 
+def _effective_fee_rate(fee_rate: float) -> float:
+    """
+    Resolve effective fee rate with sensible defaults:
+    - If caller passes <= 0, use PAPER_TRADE_FEE_RATE env if set, else 0.001 (0.1%).
+    """
+    try:
+        fr = float(fee_rate)
+    except Exception:
+        fr = 0.0
+    if fr <= 0:
+        fr_env = os.environ.get("PAPER_TRADE_FEE_RATE", "0.001")
+        try:
+            fr = float(fr_env)
+        except Exception:
+            fr = 0.001
+        if fr <= 0:
+            fr = 0.001
+    return fr
+
+
 def compute_post_trade_balances(
     balances: Balances,
     side: str,
@@ -46,7 +67,7 @@ def compute_post_trade_balances(
     quote_asset: str,
     price: float,
     quantity: float,
-    fee_rate: float = 0.0,
+    fee_rate: float = 0.001,
 ) -> Balances:
     """
     Mutates and returns balances using immediate-fill semantics.
@@ -59,7 +80,7 @@ def compute_post_trade_balances(
     side = _norm_side(side)
     price = float(price)
     qty = float(quantity)
-    fee_rate = float(fee_rate)
+    fee_rate = _effective_fee_rate(fee_rate)
 
     base = _ensure_asset(balances, base_asset)
     quote = _ensure_asset(balances, quote_asset)
@@ -88,3 +109,44 @@ def compute_post_trade_balances(
     _recompute_total(base)
     _recompute_total(quote)
     return balances
+
+
+def compute_trade_fee(
+    side: str,
+    price: float,
+    quantity: float,
+    fee_rate: float = 0.001,
+    return_currency: str = "quote",
+) -> float:
+    """
+    Compute the trade fee amount for an immediate-fill paper trade.
+
+    - BUY: fee is charged in base; in quote terms it's (qty * fee_rate * price)
+    - SELL: fee is charged in quote; in quote terms it's (price * qty * fee_rate)
+
+    Args:
+        side: "BUY" or "SELL"
+        price: execution price
+        quantity: executed quantity
+        fee_rate: taker fee rate (fraction)
+        return_currency: "quote" or "base". If "quote", always returns the fee valued in quote.
+
+    Returns:
+        float: fee amount in the requested currency.
+    """
+    s = _norm_side(side)
+    p = float(price)
+    q = float(quantity)
+    fr = _effective_fee_rate(fee_rate)
+
+    if s == "BUY":
+        fee_base = q * fr
+        fee_quote = fee_base * p
+        return fee_quote if return_currency.lower() == "quote" else fee_base
+    elif s == "SELL":
+        gross = p * q
+        fee_quote = gross * fr
+        # No base-denominated fee for SELL in this model; return 0 if requested.
+        return fee_quote if return_currency.lower() == "quote" else 0.0
+    else:
+        raise ValueError("side must be 'BUY' or 'SELL'")
